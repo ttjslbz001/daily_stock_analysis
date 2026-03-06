@@ -294,7 +294,11 @@ class Config:
     webui_enabled: bool = False
     webui_host: str = "127.0.0.1"
     webui_port: int = 8000
-    
+
+    # === MCP Server Configuration ===
+    mcp_enabled: bool = False                    # Enable MCP server
+    mcp_api_key: Optional[str] = None            # API key for MCP authentication
+
     # === 机器人配置 ===
     bot_enabled: bool = True              # 是否启用机器人功能
     bot_command_prefix: str = "/"         # 命令前缀
@@ -662,6 +666,9 @@ class Config:
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
             webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
             webui_port=int(os.getenv('WEBUI_PORT', '8000')),
+            # === MCP Configuration ===
+            mcp_enabled=os.getenv('MCP_ENABLED', 'false').lower() == 'true',
+            mcp_api_key=os.getenv('MCP_API_KEY'),
             # 机器人配置
             bot_enabled=os.getenv('BOT_ENABLED', 'true').lower() == 'true',
             bot_command_prefix=os.getenv('BOT_COMMAND_PREFIX', '/'),
