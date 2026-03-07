@@ -38,6 +38,7 @@
 | 图片识别 | 从图片添加 | 上传自选股截图，Vision LLM 自动提取股票代码，一键加入监控 |
 | 回测 | AI 回测验证 | 自动评估历史分析准确率，方向胜率、止盈止损命中率 |
 | **Agent 问股** | **策略对话** | **多轮策略问答，支持均线金叉/缠论/波浪等 11 种内置策略，Web/Bot/API 全链路** |
+| **MCP Server** | **AI 集成** | **Model Context Protocol 服务器，让 Claude Code / ChatGPT 等 AI 直接调用分析能力** |
 | 推送 | 多渠道通知 | 企业微信、飞书、Telegram、钉钉、邮件、Pushover |
 | 自动化 | 定时运行 | GitHub Actions 定时执行，无需服务器 |
 
@@ -267,6 +268,55 @@ python main.py
 - **自定义策略**：在 `strategies/` 目录下新建 YAML 文件即可添加策略，无需写代码
 
 > **注意**：Agent 模式依赖外部 LLM（Gemini/OpenAI 等），每次对话会产生 API 调用费用。不影响非 Agent 模式（`AGENT_MODE=false` 或未设置）的正常运行。
+
+### 🔌 MCP Server（AI Agent 集成）
+
+通过 MCP (Model Context Protocol) 服务器，让 **Claude Code、ChatGPT、Cursor** 等 AI Agent 直接调用股票分析能力。
+
+#### 配置
+
+```bash
+# .env
+MCP_ENABLED=true
+MCP_API_KEY=your-secure-key-here
+```
+
+#### 可用工具
+
+| 工具 | 说明 |
+|------|------|
+| `analyze_stock` | AI 股票分析（情感评分、趋势预测、操作建议） |
+| `get_realtime_quote` | 获取实时行情（价格、涨跌幅、量比、换手率等） |
+| `search_stocks` | 按关键词搜索股票 |
+| `get_market_indices` | 获取市场指数（上证、深证、纳斯达克等） |
+
+#### Claude Code 集成
+
+在 Claude Code 配置文件中添加：
+
+```json
+{
+  "mcpServers": {
+    "stock-analysis": {
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "X-MCP-Key": "your-key-here"
+      }
+    }
+  }
+}
+```
+
+然后就可以在 Claude Code 中直接问：`分析茅台的股票`，Claude 会自动调用 MCP 工具获取实时行情和 AI 分析结果。
+
+#### 测试
+
+```bash
+# 测试 MCP 端点
+curl http://localhost:8000/mcp -H "X-MCP-Key: your-key"
+```
+
+> 详见 [开发指南 - MCP Server](DEVELOPMENT_GUIDE.md#mcp-server)
 
 ### 启动方式
 
