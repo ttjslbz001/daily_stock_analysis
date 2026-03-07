@@ -11,11 +11,12 @@
 5. [Data Flow](#data-flow)
 6. [Configuration](#configuration)
 7. [API Reference](#api-reference)
-8. [Frontend Development](#frontend-development)
-9. [Bot Development](#bot-development)
-10. [Testing](#testing)
-11. [Deployment](#deployment)
-12. [Contributing](#contributing)
+8. [MCP Server](#mcp-server)
+9. [Frontend Development](#frontend-development)
+10. [Bot Development](#bot-development)
+11. [Testing](#testing)
+12. [Deployment](#deployment)
+13. [Contributing](#contributing)
 
 ---
 
@@ -596,6 +597,54 @@ curl -X POST http://localhost:8000/api/v1/agent/chat \
 curl -X PUT http://localhost:8000/api/v1/system/config \
   -H "Content-Type: application/json" \
   -d '{"STOCK_LIST": "600519,000001,300750"}'
+```
+
+---
+
+## MCP Server
+
+The project includes an MCP (Model Context Protocol) server for AI agent integration.
+
+#### Configuration
+
+```bash
+# .env
+MCP_ENABLED=true
+MCP_API_KEY=your-secure-key-here
+```
+
+#### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `analyze_stock` | Trigger AI stock analysis |
+| `get_realtime_quote` | Get real-time stock price |
+| `search_stocks` | Search stocks by keyword |
+| `get_market_indices` | Get market index data |
+
+#### Claude Code Integration
+
+Add to your Claude Code MCP config:
+
+```json
+{
+  "mcpServers": {
+    "stock-analysis": {
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "X-MCP-Key": "your-key-here"
+      }
+    }
+  }
+}
+```
+
+#### Testing
+
+```bash
+# Test MCP endpoint
+curl -X GET http://localhost:8000/mcp \
+  -H "X-MCP-Key: your-key"
 ```
 
 ---
