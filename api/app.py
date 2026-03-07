@@ -31,6 +31,7 @@ from api.v1 import api_v1_router
 from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.schemas.common import HealthResponse
+from src.mcp import setup_mcp
 from src.services.system_config_service import SystemConfigService
 
 
@@ -104,7 +105,13 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     )
 
     add_auth_middleware(app)
-    
+
+    # ============================================================
+    # MCP Server Setup
+    # ============================================================
+
+    setup_mcp(app)
+
     # ============================================================
     # 注册路由
     # ============================================================
