@@ -963,6 +963,62 @@ class DataFetcherManager:
                 continue
         return []
 
+    def search_stocks(self, keyword: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        搜索股票（按关键字匹配代码或名称）
+
+        Args:
+            keyword: 搜索关键字（代码或名称的一部分）
+            limit: 返回结果的最大数量
+
+        Returns:
+            List[Dict]: 匹配的股票列表，每个元素包含:
+                - code: 股票代码
+                - name: 股票名称
+                - market: 市场标识（如 "SH", "SZ"）
+        """
+        keyword_upper = keyword.upper().strip()
+        results = []
+
+        for fetcher in self._fetchers:
+            if not hasattr(fetcher, 'get_stock_list'):
+                continue
+            try:
+                stock_list = fetcher.get_stock_list()
+                if stock_list is None or stock_list.empty:
+                    continue
+
+                # 匹配代码或名称
+                for _, row in stock_list.iterrows():
+                    code = str(row.get('code', ''))
+                    name = str(row.get('name', ''))
+
+                    if keyword_upper in code.upper() or keyword_upper in name.upper():
+                        # 判断市场
+                        market = ""
+                        if code.startswith('6'):
+                            market = "SH"
+                        elif code.startswith(('0', '3')):
+                            market = "SZ"
+                        elif code.startswith('68'):
+                            market = "SH"  # 科创板
+
+                        results.append({
+                            "code": code,
+                            "name": name,
+                            "market": market,
+                        })
+
+                if results:
+                    # 限制返回数量
+                    return results[:limit]
+
+            except Exception as e:
+                logger.debug(f"[{fetcher.name}] 搜索股票失败: {e}")
+                continue
+
+        return results[:limit]
+
     def get_market_stats(self) -> Dict[str, Any]:
         """获取市场涨跌统计（自动切换数据源）"""
         for fetcher in self._fetchers:
