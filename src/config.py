@@ -984,14 +984,29 @@ class Config:
 
     def refresh_stock_list(self) -> None:
         """
-        热读取 STOCK_LIST 环境变量并更新配置中的自选股列表
-        
-        支持两种配置方式：
-        1. .env 文件（本地开发、定时任务模式） - 修改后下次执行自动生效
-        2. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
+        热读取股票列表，优先从数据库分组获取，其次从 STOCK_LIST 环境变量
+
+        支持三种配置方式：
+        1. 数据库分组（StockGroup 表） - 优先级最高，支持分组管理
+        2. .env 文件（本地开发、定时任务模式） - 修改后下次执行自动生效
+        3. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
         """
-        # 优先从 .env 文件读取最新配置，这样即使在容器环境中修改了 .env 文件，
-        # 也能获取到最新的股票列表配置
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # 优先从数据库分组获取股票列表
+        try:
+            from src.services import StockGroupService
+            service = StockGroupService()
+            db_stock_list = service.get_all_stock_codes()
+            if db_stock_list:
+                logger.info(f"从数据库分组获取到 {len(db_stock_list)} 只股票")
+                self.stock_list = [c.upper() for c in db_stock_list]
+                return
+        except Exception as e:
+            logger.debug(f"从数据库分组获取股票列表失败，回退到环境变量: {e}")
+
+        # 回退到 STOCK_LIST 环境变量
         env_file = os.getenv("ENV_FILE")
         env_path = Path(env_file) if env_file else (Path(__file__).parent.parent / '.env')
         stock_list_str = ''
