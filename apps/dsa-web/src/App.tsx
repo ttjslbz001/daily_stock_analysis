@@ -6,6 +6,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ChatPage from './pages/ChatPage';
+import GroupsPage from './pages/GroupsPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
 
@@ -39,6 +40,13 @@ const ChatIcon: React.FC<{ active?: boolean }> = ({active}) => (
     </svg>
 );
 
+const GroupsIcon: React.FC<{ active?: boolean }> = ({active}) => (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2 : 1.5}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+    </svg>
+);
+
 const LogoutIcon: React.FC = () => (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -59,6 +67,12 @@ const NAV_ITEMS: DockItem[] = [
         label: '首页',
         to: '/',
         icon: HomeIcon,
+    },
+    {
+        key: 'groups',
+        label: '分组',
+        to: '/groups',
+        icon: GroupsIcon,
     },
     {
         key: 'chat',
@@ -174,6 +188,7 @@ const AppContent: React.FC = () => {
             <main className="flex-1 dock-safe-area">
                 <Routes>
                     <Route path="/" element={<HomePage/>}/>
+                    <Route path="/groups" element={<GroupsPage/>}/>
                     <Route path="/chat" element={<ChatPage/>}/>
                     <Route path="/backtest" element={<BacktestPage/>}/>
                     <Route path="/settings" element={<SettingsPage/>}/>
