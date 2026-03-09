@@ -435,10 +435,10 @@ class StockTag(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # 股票代码
-    stock_code = Column(String(10), nullable=False, index=True)
+    stock_code = Column(String(10), nullable=False)
 
     # 标签名称
-    tag_name = Column(String(50), nullable=False, index=True)
+    tag_name = Column(String(50), nullable=False)
 
     # 时间戳
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
