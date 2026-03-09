@@ -316,7 +316,7 @@ MCP_API_KEY=your-secure-key-here
 curl http://localhost:8000/mcp -H "X-MCP-Key: your-key"
 ```
 
-> 详见 [开发指南 - MCP Server](DEVELOPMENT_GUIDE.md#mcp-server)
+> 详见 [MCP 集成文档](docs/mcp_integration.md) | [开发指南](DEVELOPMENT_GUIDE.md#mcp-server)
 
 ### 启动方式
 

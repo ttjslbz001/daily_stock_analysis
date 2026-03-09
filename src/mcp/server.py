@@ -157,7 +157,7 @@ def setup_mcp(app: FastAPI) -> None:
 
     @app.get("/mcp")
     async def handle_mcp_sse(request: Request):
-        """Handle MCP SSE connection."""
+        """Handle MCP SSE connection (GET for receiving events)."""
         # Validate API key
         provided_key = request.headers.get("X-MCP-Key")
         if not validate_mcp_api_key(provided_key, config.mcp_api_key):
@@ -173,5 +173,16 @@ def setup_mcp(app: FastAPI) -> None:
                 writer,
                 _mcp_server.create_initialization_options(),
             )
+
+    @app.post("/mcp")
+    async def handle_mcp_post(request: Request):
+        """Handle MCP POST requests (for sending messages to server)."""
+        # Validate API key
+        provided_key = request.headers.get("X-MCP-Key")
+        if not validate_mcp_api_key(provided_key, config.mcp_api_key):
+            raise HTTPException(status_code=401, detail="Invalid MCP API key")
+
+        # Use SseServerTransport's handle_post_message for POST requests
+        await sse.handle_post_message(request.scope, request.receive, request._send)
 
     logger.info("MCP server initialized at /mcp")

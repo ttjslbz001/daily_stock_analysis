@@ -35,7 +35,7 @@ def validate_stock_code(code: str) -> bool:
 async def analyze_stock(
     stock_code: str,
     report_type: str = "simple",
-    force_refresh: bool = False
+    force_refresh: bool = False  # noqa: ARG001 - kept for API compatibility
 ) -> Dict[str, Any]:
     """
     Analyze a stock using AI.
@@ -43,7 +43,7 @@ async def analyze_stock(
     Args:
         stock_code: Stock code to analyze
         report_type: "simple" or "full"
-        force_refresh: Force re-fetch data
+        force_refresh: Force re-fetch data (currently not used)
 
     Returns:
         Analysis result with success status and data/error
@@ -62,7 +62,7 @@ async def analyze_stock(
         result = service.submit_analysis(
             code=code,
             report_type=ReportType.from_str(report_type),
-            force_refresh=force_refresh
+            query_source="mcp"
         )
 
         if result.get("success"):
