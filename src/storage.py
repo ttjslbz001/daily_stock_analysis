@@ -423,6 +423,22 @@ class StockGroup(Base):
         self.stock_codes = json.dumps(codes, ensure_ascii=False)
 
 
+class StockWatchlist(Base):
+    """
+    股票自选列表模型
+
+    存储用户关注的股票代码
+    """
+    __tablename__ = 'stock_watchlist'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stock_code = Column(String(20), unique=True, nullable=False, index=True)
+    added_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    def __repr__(self):
+        return f"<StockWatchlist(id={self.id}, stock_code='{self.stock_code}')>"
+
+
 class DatabaseManager:
     """
     数据库管理器 - 单例模式
