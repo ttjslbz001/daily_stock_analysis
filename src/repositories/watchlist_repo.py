@@ -3,7 +3,6 @@
 
 from typing import List, Optional
 from sqlalchemy import select, delete
-from sqlalchemy.exc import IntegrityError
 
 from src.storage import DatabaseManager, StockWatchlist
 
