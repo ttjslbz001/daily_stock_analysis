@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { groupsApi, StockGroup, CreateGroupRequest, UpdateGroupRequest } from '../api/groups';
+import { groupsApi } from '../api/groups';
+import type { StockGroup, CreateGroupRequest, UpdateGroupRequest } from '../api/groups';
 
 interface GroupsState {
   groups: StockGroup[];

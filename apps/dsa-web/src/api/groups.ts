@@ -52,4 +52,5 @@ export const groupsApi = {
   getGroupStocks: async (id: number): Promise<any> => {
     const response = await apiClient.get(`/api/v1/groups/${id}/stocks`);
     return toCamelCase(response.data);
-  };
+  },
+};

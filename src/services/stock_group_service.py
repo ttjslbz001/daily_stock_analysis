@@ -21,7 +21,7 @@ class StockGroupService:
     def create_group(
         self,
         name: str,
-        stock_codes: List[str],
+        stock_codes: List[str] = None,
         description: Optional[str] = None,
         sort_order: int = 0
     ) -> StockGroup:
@@ -40,7 +40,6 @@ class StockGroupService:
         Raises:
             ValueError: If group name already exists
         """
-        # Validate stock codes
         if stock_codes is None:
             stock_codes = []
 

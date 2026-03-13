@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StockGroup, CreateGroupRequest, UpdateGroupRequest } from '../../api/groups';
+import type { StockGroup, CreateGroupRequest, UpdateGroupRequest } from '../../api/groups';
 
 interface Props {
   group?: StockGroup | null;

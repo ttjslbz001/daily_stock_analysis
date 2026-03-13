@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useGroupsStore } from '../stores/groupsStore';
 import { GroupCard } from '../components/groups/GroupCard';
 import { CreateEditGroupModal } from '../components/groups/CreateEditGroupModal';
-import { StockGroup, CreateGroupRequest, UpdateGroupRequest } from '../api/groups';
+import type { StockGroup, CreateGroupRequest, UpdateGroupRequest } from '../api/groups';
 
 export const GroupsPage: React.FC = () => {
   const { groups, loading, error, fetchGroups, createGroup, updateGroup, deleteGroup } = useGroupsStore();
