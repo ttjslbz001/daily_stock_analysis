@@ -3,7 +3,6 @@
 
 import os
 import tempfile
-from unittest.mock import patch, MagicMock
 
 import pytest
 from sqlalchemy import create_engine
