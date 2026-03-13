@@ -39,7 +39,7 @@ def get_all_tags():
 
 
 @stock_tags_router.get(
-    "/tags",
+    "/{stock_code}/tags",
     response_model=TagListResponse,
     summary="获取股票标签",
     description="获取指定股票的所有标签"
@@ -59,7 +59,7 @@ def get_stock_tags(stock_code: str):
 
 
 @stock_tags_router.post(
-    "/tags",
+    "/{stock_code}/tags",
     response_model=TagListResponse,
     summary="添加股票标签",
     description="为指定股票添加一个标签"
@@ -85,7 +85,7 @@ def add_stock_tag(stock_code: str, body: TagCreate):
 
 
 @stock_tags_router.delete(
-    "/tags/{tag_name}",
+    "/{stock_code}/tags/{tag_name}",
     response_model=TagListResponse,
     summary="删除股票标签",
     description="从指定股票删除一个标签"
