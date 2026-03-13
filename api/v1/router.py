@@ -64,8 +64,16 @@ router.include_router(
     tags=["StockGroups"]
 )
 
+# Register tags_router for /api/v1/tags (get all tags)
 router.include_router(
-    tags.router,
-    prefix="/stocks/tags",
+    tags.tags_router,
+    prefix="/tags",
+    tags=["Tags"]
+)
+
+# Register stock_tags_router for /api/v1/stocks/{code}/tags (stock-specific)
+router.include_router(
+    tags.stock_tags_router,
+    prefix="/stocks",
     tags=["StockTags"]
 )

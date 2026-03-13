@@ -11,10 +11,14 @@ from src.services.stock_tag_service import StockTagService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+# Router for /api/v1/tags (all tags)
+tags_router = APIRouter()
+
+# Router for /api/v1/stocks/{code}/tags (stock-specific)
+stock_tags_router = APIRouter()
 
 
-@router.get(
+@tags_router.get(
     "/",
     response_model=AllTagsResponse,
     summary="获取所有标签",
@@ -34,8 +38,8 @@ def get_all_tags():
         )
 
 
-@router.get(
-    "/{stock_code}",
+@stock_tags_router.get(
+    "/tags",
     response_model=TagListResponse,
     summary="获取股票标签",
     description="获取指定股票的所有标签"
@@ -54,8 +58,8 @@ def get_stock_tags(stock_code: str):
         )
 
 
-@router.post(
-    "/{stock_code}",
+@stock_tags_router.post(
+    "/tags",
     response_model=TagListResponse,
     summary="添加股票标签",
     description="为指定股票添加一个标签"
@@ -80,8 +84,8 @@ def add_stock_tag(stock_code: str, body: TagCreate):
         )
 
 
-@router.delete(
-    "/{stock_code}/{tag_name}",
+@stock_tags_router.delete(
+    "/tags/{tag_name}",
     response_model=TagListResponse,
     summary="删除股票标签",
     description="从指定股票删除一个标签"
