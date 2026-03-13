@@ -439,6 +439,34 @@ class StockWatchlist(Base):
         return f"<StockWatchlist(id={self.id}, stock_code='{self.stock_code}')>"
 
 
+class StockTag(Base):
+    """
+    股票标签模型
+
+    允许用户为股票添加自由标签（如"关注"、"突破"等）
+    """
+    __tablename__ = 'stock_tags'
+
+    # 主键
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # 股票代码
+    stock_code = Column(String(10), nullable=False)
+
+    # 标签名称
+    tag_name = Column(String(50), nullable=False)
+
+    # 时间戳
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # 索引和约束
+    __table_args__ = (
+        UniqueConstraint('stock_code', 'tag_name', name='uq_stock_tag'),
+        Index('idx_stock_tags_code', 'stock_code'),
+        Index('idx_stock_tags_name', 'tag_name'),
+    )
+
+
 class DatabaseManager:
     """
     数据库管理器 - 单例模式
