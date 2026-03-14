@@ -58,6 +58,9 @@ reports/
 .DS_Store
 Thumbs.db
 
+# Worktrees (isolated workspaces)
+.worktrees/
+
 # 测试
 .pytest_cache/
 .coverage
