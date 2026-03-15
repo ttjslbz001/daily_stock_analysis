@@ -378,6 +378,38 @@ class ConversationMessage(Base):
     created_at = Column(DateTime, default=datetime.now, index=True)
 
 
+class WatchedStock(Base):
+    """
+    关注股票表
+
+    存储用户关注的股票列表
+    """
+    __tablename__ = 'watched_stocks'
+
+    # 主键
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # 用户信息
+    user_id = Column(String(50), nullable=False, default='default_user', index=True)
+
+    # 股票信息
+    stock_code = Column(String(20), nullable=False)  # 股票代码（如 600519）
+    stock_name = Column(String(100))  # 股票名称
+
+    # 时间戳
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    # 唯一约束：同一用户不能重复关注同一只股票
+    __table_args__ = (
+        UniqueConstraint('user_id', 'stock_code', name='uix_user_stock'),
+        Index('ix_user_id', 'user_id'),
+    )
+
+    def __repr__(self):
+        return f"<WatchedStock(user_id={self.user_id}, stock_code={self.stock_code}, stock_name={self.stock_name})>"
+
+
 class DatabaseManager:
     """
     数据库管理器 - 单例模式

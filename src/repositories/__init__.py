@@ -11,9 +11,11 @@
 from src.repositories.analysis_repo import AnalysisRepository
 from src.repositories.backtest_repo import BacktestRepository
 from src.repositories.stock_repo import StockRepository
+from src.repositories.watched_stocks_repo import WatchedStocksRepository
 
 __all__ = [
     "AnalysisRepository",
     "BacktestRepository",
     "StockRepository",
+    "WatchedStocksRepository",
 ]

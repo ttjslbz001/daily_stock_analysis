@@ -126,6 +126,11 @@ class TrendAnalysisResult:
     rsi_status: RSIStatus = RSIStatus.NEUTRAL
     rsi_signal: str = ""              # RSI 信号描述
 
+    # 布林线指标
+    bollinger_upper: float = 0.0     # 布林线上轨
+    bollinger_middle: float = 0.0    # 布林线中轨（MA20）
+    bollinger_lower: float = 0.0     # 布林线下轨
+
     # 买入信号
     buy_signal: BuySignal = BuySignal.WAIT
     signal_score: int = 0            # 综合评分 0-100
@@ -165,6 +170,9 @@ class TrendAnalysisResult:
             'rsi_24': self.rsi_24,
             'rsi_status': self.rsi_status.value,
             'rsi_signal': self.rsi_signal,
+            'bollinger_upper': self.bollinger_upper,
+            'bollinger_middle': self.bollinger_middle,
+            'bollinger_lower': self.bollinger_lower,
         }
 
 
@@ -226,9 +234,10 @@ class StockTrendAnalyzer:
         # 计算均线
         df = self._calculate_mas(df)
 
-        # 计算 MACD 和 RSI
+        # 计算 MACD、RSI 和布林线
         df = self._calculate_macd(df)
         df = self._calculate_rsi(df)
+        df = self._calculate_bollinger(df)
 
         # 获取最新数据
         latest = df.iloc[-1]
@@ -256,7 +265,10 @@ class StockTrendAnalyzer:
         # 6. RSI 分析
         self._analyze_rsi(df, result)
 
-        # 7. 生成买入信号
+        # 7. 布林线分析
+        self._analyze_bollinger(df, result)
+
+        # 8. 生成买入信号
         self._generate_signal(result)
 
         return result
@@ -335,7 +347,30 @@ class StockTrendAnalyzer:
             df[col_name] = rsi
 
         return df
-    
+
+    def _calculate_bollinger(self, df: pd.DataFrame, period: int = 20, num_std: float = 2.0) -> pd.DataFrame:
+        """
+        计算布林线指标
+
+        参数:
+            period: 周期（默认20日）
+            num_std: 标准差倍数（默认2.0）
+
+        返回:
+            添加 BB_UPPER, BB_MIDDLE, BB_LOWER 列的 DataFrame
+
+        公式：
+        - 中轨 = MA(period)
+        - 上轨 = 中轨 + num_std * STD(period)
+        - 下轨 = 中轨 - num_std * STD(period)
+        """
+        df = df.copy()
+        df['BB_MIDDLE'] = df['close'].rolling(window=period).mean()
+        df['BB_STD'] = df['close'].rolling(window=period).std()
+        df['BB_UPPER'] = df['BB_MIDDLE'] + (df['BB_STD'] * num_std)
+        df['BB_LOWER'] = df['BB_MIDDLE'] - (df['BB_STD'] * num_std)
+        return df
+
     def _analyze_trend(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
         """
         分析趋势状态
@@ -579,6 +614,26 @@ class StockTrendAnalyzer:
         else:
             result.rsi_status = RSIStatus.OVERSOLD
             result.rsi_signal = f"⭐ RSI超卖({rsi_mid:.1f}<30)，反弹机会大"
+
+    def _analyze_bollinger(self, df: pd.DataFrame, result: TrendAnalysisResult) -> None:
+        """
+        分析布林线指标
+
+        核心判断：
+        - 价格突破上轨：超买信号
+        - 价格触及下轨：超卖信号
+        - 价格在中轨附近：中性区域
+        - 上下轨收缩：波动率降低，可能突破
+        """
+        if len(df) < 20:
+            return
+
+        latest = df.iloc[-1]
+
+        # 获取布林线数据
+        result.bollinger_upper = float(latest['BB_UPPER'])
+        result.bollinger_middle = float(latest['BB_MIDDLE'])
+        result.bollinger_lower = float(latest['BB_LOWER'])
 
     def _generate_signal(self, result: TrendAnalysisResult) -> None:
         """

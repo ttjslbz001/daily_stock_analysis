@@ -30,25 +30,25 @@
 ## 实施阶段
 
 ### Phase 1: 数据库层 (10分钟)
-- [ ] 创建 `watched_stocks` 表
-- [ ] 实现 `WatchedStocksRepository` 类
-- [ ] 添加 CRUD 方法（add, remove, list, exists）
-- [ ] 测试数据库操作
+- [x] 创建 `watched_stocks` 表
+- [x] 实现 `WatchedStocksRepository` 类
+- [x] 添加 CRUD 方法（add, remove, list, exists）
+- [x] 测试数据库操作
 
 ### Phase 2: 后端核心逻辑 (30分钟)
-- [ ] 在 `StockTrendAnalyzer` 中添加 `_calculate_bollinger` 方法
-- [ ] 在 `TrendAnalysisResult` 中添加布林线字段
-- [ ] 创建 `TechnicalIndicatorsService` 服务类
-- [ ] 实现批量获取技术指标方法
-- [ ] 实现获取实时行情方法
+- [x] 在 `StockTrendAnalyzer` 中添加 `_calculate_bollinger` 方法
+- [x] 在 `TrendAnalysisResult` 中添加布林线字段
+- [x] 创建 `TechnicalIndicatorsService` 服务类
+- [x] 实现批量获取技术指标方法
+- [x] 实现获取实时行情方法
 
 ### Phase 3: 后端 API (20分钟)
-- [ ] 创建 Pydantic 模型（schemas/watched_stocks.py）
-- [ ] 实现 GET /api/v1/watched 端点
-- [ ] 实现 POST /api/v1/watched 端点
-- [ ] 实现 DELETE /api/v1/watched/{stock_code} 端点
-- [ ] 在 app.py 中注册路由
-- [ ] 测试 API 端点
+- [x] 创建 Pydantic 模型（schemas/watched_stocks.py）
+- [x] 实现 GET /api/v1/watched 端点
+- [x] 实现 POST /api/v1/watched 端点
+- [x] 实现 DELETE /api/v1/watched/{stock_code} 端点
+- [x] 在 app.py 中注册路由
+- [x] 测试 API 端点
 
 ### Phase 4: 前端类型定义 (10分钟)
 - [ ] 创建 watchedStocks.ts 类型文件
@@ -105,9 +105,14 @@
 
 ## 状态
 - 总任务数: 42
-- 已完成: 0
+- 已完成: 17
 - 进行中: 0
-- 待开始: 42
+- 待开始: 25
 
 ## 下一步
-从 Phase 1 开始，创建数据库表和 Repository 类
+从 Phase 4 开始，创建前端类型定义和 API 服务
+
+## 遇到的错误
+- Python 环境缺少依赖包（dotenv、fastapi 等），无法启动服务器进行完整测试
+- 已通过直接 SQLite 测试验证数据库操作正常工作
+- Pydantic 模型结构正确，但无法在当前环境导入 FastAPI

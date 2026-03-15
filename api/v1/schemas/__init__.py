@@ -58,6 +58,16 @@ from api.v1.schemas.system_config import (
     SystemConfigValidationErrorResponse,
     SystemConfigConflictResponse,
 )
+from api.v1.schemas.watched_stocks import (
+    BollingerBands,
+    MACD,
+    RSI,
+    WatchedStockResponse,
+    WatchedStocksListResponse,
+    AddWatchedStockRequest,
+    AddWatchedStockResponse,
+    RemoveWatchedStockResponse,
+)
 
 __all__ = [
     # common
@@ -104,4 +114,13 @@ __all__ = [
     "ValidateSystemConfigResponse",
     "SystemConfigValidationErrorResponse",
     "SystemConfigConflictResponse",
+    # watched stocks
+    "BollingerBands",
+    "MACD",
+    "RSI",
+    "WatchedStockResponse",
+    "WatchedStocksListResponse",
+    "AddWatchedStockRequest",
+    "AddWatchedStockResponse",
+    "RemoveWatchedStockResponse",
 ]
