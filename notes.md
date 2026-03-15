@@ -1,5 +1,127 @@
 # 项目笔记
 
+## 软件工程改进
+
+### 2026-03-15 - P0-P1 改进完成
+
+#### P0 关键问题 (已完成)
+
+1. **CI 安全扫描** ✅
+   - 创建 `.github/workflows/security.yml`
+   - 包含 Safety (依赖漏洞扫描)、Bandit (SAST)、Semgrep (SAST)
+   - 添加 CodeQL 分析支持
+   - 集成 TruffleHog 密钥泄露检测
+   - 支持定时扫描和手动触发
+
+2. **数据库 Session 管理** ✅
+   - 实现 `SessionContext` 类，支持自动事务管理
+   - 添加 `__enter__/__exit__` 方法确保资源正确释放
+   - 改进 `DatabaseManager.get_session()` 返回上下文管理器
+   - 支持自动提交和手动提交两种模式
+   - 详细的错误日志记录
+
+3. **测试覆盖率** ✅
+   - 创建 `pytest.ini` 配置文件
+   - 添加 pytest、pytest-cov 等测试依赖
+   - 设置 70% 覆盖率阈值
+   - 生成 HTML、XML 和终端覆盖率报告
+   - 更新 CI workflow 添加测试覆盖率任务
+
+4. **错误处理** ✅
+   - 创建 `ErrorCode` 类，统一错误码定义
+   - 实现 `create_error_response()` 函数，标准化错误响应
+   - 改进 `ErrorHandlerMiddleware`，添加请求 ID 追踪
+   - 支持调试模式，返回详细错误信息
+   - 集成 SQLAlchemy 异常处理
+
+#### P1 高优先级问题 (已完成)
+
+1. **依赖注入/代码复用** ✅
+   - 创建 `BaseRepository` 泛型基类
+   - 提供通用 CRUD 操作 (get, create, update, delete, filter, count)
+   - 支持批量操作 (bulk_create)
+   - 自动错误处理和日志记录
+   - 类型安全的查询构建
+
+2. **架构文档** ✅
+   - 创建 `docs/ARCHITECTURE.md`
+   - 包含系统概述和技术栈
+   - 详细的分层架构图
+   - 核心模块设计说明
+   - 数据流图
+   - 安全性和性能优化策略
+   - 部署和监控指南
+
+3. **前端测试** ⏸️ (待后续实施)
+   - 规划使用 Vitest + Testing Library
+   - 需要创建前端测试套件
+
+4. **API 文档** ⏸️ (待后续实施)
+   - 当前使用 FastAPI 自动生成的 OpenAPI 文档
+   - 计划添加更多错误码文档和示例响应
+
+### 技术细节
+
+#### SessionContext 使用示例
+
+```python
+# 自动提交模式（默认）
+with db.get_session() as session:
+    result = session.query(Stock).all()
+    # 自动提交事务
+
+# 手动提交模式
+with db.get_session(auto_commit=False) as session:
+    session.add(obj1)
+    session.add(obj2)
+    session.commit()  # 手动提交
+    # 如果发生异常，自动回滚
+```
+
+#### BaseRepository 使用示例
+
+```python
+from src.repositories.base import BaseRepository
+from src.storage import StockDaily
+
+class StockRepository(BaseRepository[StockDaily]):
+    def __init__(self):
+        super().__init__(StockDaily)
+
+    # 继承通用方法：
+    # - get_by_id(id)
+    # - get_all(limit, offset, order_by)
+    # - filter(filters)
+    # - create(**kwargs)
+    # - update(id, **kwargs)
+    # - delete(id)
+    # - count(filters)
+    # - bulk_create(items)
+```
+
+#### 错误响应格式
+
+```json
+{
+  "error": "error_code",
+  "message": "Human readable message",
+  "timestamp": "2024-01-01T00:00:00Z",
+  "request_id": "uuid",
+  "detail": {...}
+}
+```
+
+### 相关文件
+
+- `.github/workflows/security.yml` - 安全扫描 CI workflow
+- `.github/workflows/ci.yml` - CI workflow（已更新）
+- `pytest.ini` - 测试配置
+- `src/storage.py` - SessionContext 类
+- `src/repositories/base.py` - BaseRepository 类
+- `api/middlewares/error_handler.py` - 错误处理中间件
+- `docs/ARCHITECTURE.md` - 系统架构文档
+- `requirements.txt` - 更新的依赖列表
+
 ## 关注股票功能改进
 
 ### 设计决策
