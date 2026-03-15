@@ -7,7 +7,7 @@
 ## Progress Summary
 
 **Total Tasks:** 10
-**Completed:** 0
+**Completed:** 3
 **In Progress:** 0
 **Blocked:** 0
 
@@ -15,18 +15,20 @@
 
 ## Phase 1: Create the Scheduler Service (2 tasks)
 
-- [ ] Task 1.1: Create WatchListIndicatorScheduler class
-  - File: `src/services/watchlist_indicator_scheduler.py`
+- [x] Task 1.1: Create WatchListIndicatorScheduler class
+  - File: `src/schedulers/watchlist_indicator_scheduler.py` (Note: corrected path)
   - Create new file with scheduler class
   - Define all methods: __init__, start, stop, refresh_if_needed, _refresh_all_indicators, _is_refresh_needed, _run_refresh_loop
   - Add comprehensive logging
   - Estimated time: 15-20 minutes
+  - **Completed:** 2026-03-15
 
-- [ ] Task 1.2: Implement staleness checking logic
+- [x] Task 1.2: Implement staleness checking logic
   - Implement `_is_refresh_needed()` method
   - Check `indicators_cached_at` against 8-hour threshold
   - Handle None values (never cached)
   - Estimated time: 10 minutes
+  - **Completed:** 2026-03-15
 
 ---
 
@@ -61,16 +63,18 @@
 
 ## Phase 4: Testing (3 tasks)
 
-- [ ] Task 4.1: Write unit tests for staleness checking
+- [x] Task 4.1: Write unit tests for staleness checking
   - File: `tests/test_watchlist_indicator_scheduler.py`
   - Test _is_refresh_needed() with various scenarios
   - Test with None, old, recent timestamps
   - Estimated time: 15 minutes
+  - **Completed:** 2026-03-15
 
-- [ ] Task 4.2: Write unit tests for refresh logic
+- [x] Task 4.2: Write unit tests for refresh logic
   - Test _refresh_all_indicators() with mocks
   - Test error handling for individual stock failures
   - Estimated time: 15 minutes
+  - **Completed:** 2026-03-15
 
 - [ ] Task 4.3: Manual integration testing
   - Start server and verify initial refresh
@@ -129,6 +133,19 @@
 
 ## Status
 
-**Phase:** 0 (Planning Complete)
-**Next Task:** Task 1.1 - Create WatchListIndicatorScheduler class
-**Recommended First Task:** Phase 1, Task 1.1
+**Phase:** 1 (Scheduler Service Complete - Testing Complete)
+**Next Task:** Task 2.1 - Add scheduler to app_lifespan
+**Recommended First Task:** Phase 2, Task 2.1
+
+**Session Notes (2026-03-15):**
+- Created WatchListIndicatorScheduler class in `src/schedulers/watchlist_indicator_scheduler.py`
+- Implemented all required methods: __init__, start, stop, refresh_if_needed, _refresh_all_indicators, _is_refresh_needed, _run_refresh_loop
+- Added comprehensive logging throughout
+- Wrote 14 unit tests covering:
+  - Initialization
+  - Staleness checking (None, old, fresh, threshold scenarios)
+  - Refresh logic (success, individual failures, empty watchlist)
+  - Scheduler lifecycle (start/stop)
+  - Configuration (custom interval, custom user_id)
+- All 14 tests pass
+- Existing test suite still passes (no regressions)
