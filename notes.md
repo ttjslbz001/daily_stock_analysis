@@ -1,5 +1,175 @@
 # 项目笔记
 
+## 前端测试改进
+
+### 2026-03-15 - 前端测试基础设施完成
+
+#### 测试框架配置 ✅
+
+1. **Vitest 配置**
+   - 创建 `apps/dsa-web/vitest.config.ts`
+   - 配置 jsdom 测试环境
+   - 设置 70% 覆盖率阈值（行、函数、分支、语句）
+   - 配置覆盖率报告（HTML、JSON、LCOV）
+   - 支持并行测试执行
+
+2. **测试环境设置**
+   - 创建 `apps/dsa-web/src/test/setup.ts`
+   - 集成 @testing-library/jest-dom 匹配器
+   - 自动清理 DOM（afterEach）
+
+3. **测试依赖**
+   - @testing-library/react - React 组件测试
+   - @testing-library/user-event - 用户交互模拟
+   - @testing-library/jest-dom - DOM 匹配器
+   - @vitest/ui - 可视化测试 UI
+   - @vitest/coverage-v8 - 覆盖率工具
+   - jsdom - DOM 环境
+
+#### 测试脚本 ✅
+
+1. **package.json 脚本**
+   ```json
+   "test": "vitest"                    // 监听模式
+   "test:ui": "vitest --ui"          // 可视化 UI
+   "test:run": "vitest run"           // 单次运行
+   "test:coverage": "vitest run --coverage"  // 覆盖率报告
+   "type-check": "tsc --noEmit"       // 类型检查
+   "check": "npm run type-check && npm run lint && npm run test:run"  // 完整检查
+   ```
+
+2. **全项目测试脚本** (`scripts/test-all.sh`)
+   - Python 语法检查
+   - 后端 pytest 测试（覆盖率 60%）
+   - 前端类型检查（TypeScript）
+   - 前端 lint（ESLint）
+   - 前端测试（Vitest）
+   - 前端构建验证
+
+3. **Pre-commit 检查脚本** (`scripts/pre-commit-check.sh`)
+   - Python 文件语法检查
+   - Python flake8 代码风格检查
+   - TypeScript/JavaScript 类型检查
+   - ESLint 代码风格检查
+   - JSON/YAML 配置文件验证
+   - 快速测试（跳过慢测试）
+
+4. **Makefile 简化命令**
+   - `make test-all` - 运行所有测试
+   - `make test-quick` - 快速测试
+   - `make test-backend` - 后端测试
+   - `make test-frontend` - 前端测试
+   - `make test-coverage-backend` - 后端覆盖率
+   - `make test-coverage-frontend` - 前端覆盖率
+   - `make check` - 完整检查（类型 + lint + 测试）
+   - `make build` - 构建所有项目
+   - `make dev` - 启动开发服务器
+
+#### CI/CD 集成 ✅
+
+1. **更新 CI workflow**
+   - web-gate 任务添加：
+     - TypeScript 类型检查
+     - ESLint 代码风格检查
+     - Vitest 测试执行
+     - 覆盖率报告上传
+   - 并行执行后端和前端测试
+
+2. **Git Pre-commit Hook**
+   - 配置 `.git/hooks/pre-commit`
+   - 自动运行 pre-commit 检查脚本
+   - 防止提交有问题的代码
+
+#### 测试示例 ✅
+
+1. **组件测试示例** (`src/components/Button.test.tsx`)
+   - 渲染测试
+   - 点击事件测试
+   - 禁用状态测试
+
+2. **API 测试示例** (`src/api/watchedStocks.test.ts`)
+   - API 调用测试
+   - 错误处理测试
+   - 参数验证测试
+
+#### 使用指南
+
+##### 本地开发
+
+```bash
+# 运行所有测试（后端 + 前端）
+make test-all
+
+# 运行快速测试（跳过慢测试）
+make test-quick
+
+# 只运行前端测试
+make test-frontend
+
+# 运行前端测试覆盖率
+make test-coverage-frontend
+
+# 运行前端测试 UI
+cd apps/dsa-web && npm run test:ui
+
+# 完整检查（类型 + lint + 测试）
+make check
+```
+
+##### 提交前检查
+
+```bash
+# Git 会自动运行 pre-commit 检查
+git add .
+git commit  # 自动运行检查脚本
+
+# 手动运行检查
+./scripts/pre-commit-check.sh
+```
+
+##### CI/CD
+
+- PR 创建或更新时自动运行
+- 并行执行后端和前端测试
+- 生成覆盖率报告
+- 上传到 GitHub Actions artifacts
+
+#### 测试覆盖率目标
+
+- **总体覆盖率**: 70%
+- **核心模块**: 80%
+- **新增代码**: 85%
+
+#### 测试文件位置
+
+```
+apps/dsa-web/
+├── src/
+│   ├── components/
+│   │   └── Button.test.tsx        # 组件测试示例
+│   ├── api/
+│   │   └── watchedStocks.test.ts  # API 测试示例
+│   └── test/
+│       └── setup.ts              # 测试环境设置
+├── vitest.config.ts              # Vitest 配置
+└── package.json                  # 测试脚本
+
+scripts/
+├── test-all.sh                  # 全项目测试
+└── pre-commit-check.sh           # Pre-commit 检查
+
+Makefile                        # Make 命令
+```
+
+#### 后续改进
+
+- [ ] 添加更多组件测试
+- [ ] 添加集成测试
+- [ ] 添加 E2E 测试（Playwright）
+- [ ] 创建测试工具函数和 mock 数据
+- [ ] 添加性能测试
+- [ ] 创建测试文档
+
 ## 软件工程改进
 
 ### 2026-03-15 - P0-P1 改进完成
