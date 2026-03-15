@@ -73,10 +73,12 @@ class WatchListIndicatorScheduler:
 
         logger.info("Starting WatchListIndicatorScheduler")
 
-        # Initial check - refresh if any indicators are stale
+        # Initial check - refresh if any indicators are stale on startup
+        # This ensures that indicators are fresh when the server starts
         await self.refresh_if_needed()
 
-        # Start the periodic refresh loop
+        # Start the periodic refresh loop in the background
+        # This runs asynchronously and doesn't block the main application
         self._running = True
         self._refresh_task = asyncio.create_task(self._run_refresh_loop())
         logger.info(
@@ -119,8 +121,26 @@ class WatchListIndicatorScheduler:
                 return
 
             # Check if any stock needs refresh
-            needs_refresh = any(self._is_refresh_needed(stock) for stock in watched_stocks)
+            # Extract indicators_cached_at before session closes to avoid DetachedInstanceError
+            # This is necessary because SQLAlchemy objects become detached when the session context exits
+            stock_timestamps = []
+            for stock in watched_stocks:
+                try:
+                    timestamp = stock.indicators_cached_at
+                    stock_timestamps.append(timestamp)
+                except Exception as e:
+                    logger.warning(f"Error accessing indicators_cached_at for {stock.stock_code}: {e}")
+                    # If we can't access the timestamp, assume refresh is needed
+                    # This ensures we don't skip refreshing stocks with potential data issues
+                    stock_timestamps.append(None)
 
+            # Determine if any stock needs refresh based on cached timestamps
+            needs_refresh = any(
+                self._is_refresh_needed_with_timestamp(timestamp)
+                for timestamp in stock_timestamps
+            )
+
+            # Trigger batch refresh if any stock's indicators are stale
             if needs_refresh:
                 logger.info("Some indicators are stale, triggering refresh")
                 await self._refresh_all_indicators()
@@ -147,10 +167,12 @@ class WatchListIndicatorScheduler:
             stock_codes = [stock.stock_code for stock in watched_stocks]
             logger.info(f"Refreshing indicators for {len(stock_codes)} stocks: {stock_codes}")
 
-            # Batch fetch indicators
+            # Batch fetch indicators from the data source
+            # This is more efficient than fetching each stock individually
             indicators_data = self.indicators_service.get_indicators(stock_codes)
 
-            # Update each stock's cached indicators
+            # Update each stock's cached indicators in the database
+            # Individual failures are logged but don't stop the batch operation
             success_count = 0
             failure_count = 0
 
@@ -158,6 +180,7 @@ class WatchListIndicatorScheduler:
                 code = stock.stock_code
                 if code in indicators_data:
                     try:
+                        # Update the cached indicators in the database
                         success = self.repo.update_cached_indicators(
                             code,
                             indicators_data[code],
@@ -169,12 +192,15 @@ class WatchListIndicatorScheduler:
                             failure_count += 1
                             logger.warning(f"Failed to update cached indicators for {code}")
                     except Exception as e:
+                        # Log error but continue with other stocks
                         failure_count += 1
                         logger.error(f"Error updating {code} indicators: {e}", exc_info=True)
                 else:
+                    # No data returned for this stock - possibly invalid code or API issue
                     failure_count += 1
                     logger.warning(f"No indicators data returned for {code}")
 
+            # Log summary of the refresh operation
             logger.info(
                 f"Refresh complete: {success_count} succeeded, {failure_count} failed"
             )
@@ -202,6 +228,29 @@ class WatchListIndicatorScheduler:
 
         return time_since_refresh > threshold
 
+    def _is_refresh_needed_with_timestamp(self, cached_at) -> bool:
+        """
+        Check if indicators need refreshing given a timestamp
+
+        This helper method avoids DetachedInstanceError by working with timestamps
+        directly instead of accessing attributes on detached SQLAlchemy objects.
+
+        Args:
+            cached_at: datetime object or None representing when indicators were cached
+
+        Returns:
+            True if indicators are stale (older than threshold) or never cached
+        """
+        # If indicators were never cached, refresh is needed
+        if cached_at is None:
+            return True
+
+        # Check if indicators are older than the threshold
+        time_since_refresh = datetime.now() - cached_at
+        threshold = timedelta(hours=self.refresh_interval_hours)
+
+        return time_since_refresh > threshold
+
     async def _run_refresh_loop(self) -> None:
         """
         Run the periodic refresh loop
@@ -211,10 +260,12 @@ class WatchListIndicatorScheduler:
         """
         try:
             while self._running:
-                # Sleep for the interval
+                # Sleep for the configured interval (in seconds)
+                # Convert hours to seconds: refresh_interval_hours * 3600
                 await asyncio.sleep(self.refresh_interval_hours * 3600)
 
-                # Check if still running before proceeding
+                # Double-check if still running before proceeding
+                # This handles the case where stop() is called during the sleep period
                 if not self._running:
                     break
 
@@ -222,7 +273,10 @@ class WatchListIndicatorScheduler:
                 await self._refresh_all_indicators()
 
         except asyncio.CancelledError:
+            # Gracefully handle task cancellation when stop() is called
             logger.debug("Refresh loop cancelled")
             raise
         except Exception as e:
+            # Log any unexpected errors but don't crash the loop
+            # The loop will continue after logging the error
             logger.error(f"Error in refresh loop: {e}", exc_info=True)

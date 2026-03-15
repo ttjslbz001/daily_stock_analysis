@@ -139,6 +139,7 @@ class WatchedStocksRepository:
 
         Returns:
             WatchedStock 对象列表（按创建时间倒序）
+            Note: Returns a list of WatchedStock objects with all attributes loaded
         """
         user_id = user_id or self.DEFAULT_USER_ID
 
@@ -149,7 +150,38 @@ class WatchedStocksRepository:
                     .where(WatchedStock.user_id == user_id)
                     .order_by(desc(WatchedStock.created_at))
                 ).scalars().all()
-                return list(result)
+                # Convert to list and ensure all attributes are loaded
+                # This prevents DetachedInstanceError when accessing attributes later
+                return [
+                    WatchedStock(
+                        id=stock.id,
+                        user_id=stock.user_id,
+                        stock_code=stock.stock_code,
+                        stock_name=stock.stock_name,
+                        cached_price=stock.cached_price,
+                        cached_change=stock.cached_change,
+                        cached_change_percent=stock.cached_change_percent,
+                        cached_bollinger_upper=stock.cached_bollinger_upper,
+                        cached_bollinger_middle=stock.cached_bollinger_middle,
+                        cached_bollinger_lower=stock.cached_bollinger_lower,
+                        cached_macd_dif=stock.cached_macd_dif,
+                        cached_macd_dea=stock.cached_macd_dea,
+                        cached_macd_bar=stock.cached_macd_bar,
+                        cached_rsi6=stock.cached_rsi6,
+                        cached_rsi12=stock.cached_rsi12,
+                        cached_rsi24=stock.cached_rsi24,
+                        cached_kdj_k=stock.cached_kdj_k,
+                        cached_kdj_d=stock.cached_kdj_d,
+                        cached_kdj_j=stock.cached_kdj_j,
+                        cached_volume=stock.cached_volume,
+                        cached_year_high=stock.cached_year_high,
+                        cached_year_low=stock.cached_year_low,
+                        indicators_cached_at=stock.indicators_cached_at,
+                        created_at=stock.created_at,
+                        updated_at=stock.updated_at,
+                    )
+                    for stock in result
+                ]
         except Exception as e:
             logger.error(f"获取关注股票列表失败: {e}", exc_info=True)
             return []

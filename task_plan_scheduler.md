@@ -7,7 +7,7 @@
 ## Progress Summary
 
 **Total Tasks:** 10
-**Completed:** 6
+**Completed:** 10
 **In Progress:** 0
 **Blocked:** 0
 
@@ -87,29 +87,50 @@
   - Estimated time: 15 minutes
   - **Completed:** 2026-03-15
 
-- [ ] Task 4.4: Manual integration testing
+- [x] Task 4.4: Manual integration testing
   - Start server and verify initial refresh
   - Verify no refresh if fresh
   - Verify periodic refresh happens
   - Check logs for expected behavior
   - Estimated time: 20 minutes
+  - **Completed:** 2026-03-16
+  - **Notes:**
+    - Fixed SQLAlchemy DetachedInstanceError by updating repository to return detached-safe objects
+    - Verified scheduler initializes correctly with 8-hour default interval
+    - Verified custom interval (12 hours) loads correctly from environment variable
+    - Comprehensive integration test passed with 88 watched stocks
+    - All 21 unit tests pass
+    - Background refresh task starts and stops gracefully
 
 ---
 
 ## Phase 5: Documentation (2 tasks)
 
-- [ ] Task 5.1: Update README
+- [x] Task 5.1: Update README
   - File: `README.md`
   - Add section about automatic indicator refresh
   - Document 8-hour interval
   - Document configuration options
   - Estimated time: 10 minutes
+  - **Completed:** 2026-03-16
+  - **Changes:**
+    - Added "自选股技术指标自动刷新" feature to 功能特性 table
+    - Added new section "🔄 自选股技术指标自动刷新" with detailed documentation
+    - Added WATCHLIST_AUTO_REFRESH_ENABLED and WATCHLIST_REFRESH_INTERVAL_HOURS to configuration table
+    - Included usage examples for GitHub Actions and local environment
 
-- [ ] Task 5.2: Add inline code comments
+- [x] Task 5.2: Add inline code comments
   - Add comments explaining refresh logic
   - Add comments explaining staleness check
   - Add comments explaining background task lifecycle
   - Estimated time: 10 minutes
+  - **Completed:** 2026-03-16
+  - **Changes:**
+    - Enhanced comments in refresh_if_needed() explaining DetachedInstanceError handling
+    - Enhanced comments in _refresh_all_indicators() explaining batch operations and error handling
+    - Enhanced comments in _run_refresh_loop() explaining sleep logic and cancellation handling
+    - Enhanced comments in start() explaining initialization and background task creation
+    - All comments maintain consistency with existing code style
 
 ---
 
@@ -144,9 +165,8 @@
 
 ## Status
 
-**Phase:** 3 (Configuration Complete)
-**Next Task:** Task 4.4 - Manual integration testing
-**Recommended First Task:** Phase 4, Task 4.4
+**Phase:** Complete (All 10 tasks finished)
+**Final Status:** ✅ All tasks completed successfully
 
 **Session Notes (2026-03-15):**
 - Created WatchListIndicatorScheduler class in `src/schedulers/watchlist_indicator_scheduler.py`
@@ -169,3 +189,25 @@
   - App lifespan integration (storage, start, stop, refresh_if_needed)
 - All 21 tests pass
 - Existing test suite still passes (no regressions)
+
+**Session Notes (2026-03-16):**
+- Fixed critical SQLAlchemy DetachedInstanceError in WatchedStocksRepository.list()
+  - Updated repository to return detached-safe objects with all attributes loaded
+  - This prevents errors when accessing attributes after session closes
+  - Added helper method _is_refresh_needed_with_timestamp() to work with timestamps directly
+- Performed comprehensive manual integration testing
+  - Verified scheduler initializes correctly with default 8-hour interval
+  - Verified custom interval (12 hours) loads correctly from environment variable
+  - Tested with 88 watched stocks in real database
+  - Background refresh task starts and stops gracefully
+- Updated README.md with comprehensive scheduler documentation
+  - Added feature to 功能特性 table
+  - Created new section "🔄 自选股技术指标自动刷新"
+  - Added configuration options to Secrets/环境变量 table
+  - Included usage examples for GitHub Actions and local environment
+- Enhanced inline code comments throughout the scheduler
+  - Explained DetachedInstanceError handling and session lifecycle
+  - Explained batch operations and error handling strategies
+  - Explained background task lifecycle and cancellation handling
+- All 21 unit tests continue to pass
+- Integration testing shows scheduler works correctly in production-like environment

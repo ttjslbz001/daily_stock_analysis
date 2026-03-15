@@ -33,7 +33,12 @@
 - ✅ Phase 1, Task 1.2: 实现过期检查逻辑
 - ✅ Task 4.1: 编写过期检查单元测试（14个测试）
 - ✅ Task 4.2: 编写刷新逻辑单元测试
+- ✅ Task 4.3: 编写 App lifespan 集成测试（4个测试）
+- ✅ Task 4.4: 手动集成测试（2026-03-16）
+- ✅ Task 5.1: 更新 README 文档
+- ✅ Task 5.2: 添加内联代码注释
 - 测试覆盖率: 75% (新增代码)
+- **重要修复**: 修复 SQLAlchemy DetachedInstanceError 问题
 
 ### Git 状态
 - 工作区干净，无待提交的更改
@@ -578,6 +583,82 @@ WATCHLIST_REFRESH_INTERVAL_HOURS=8
 - `README.md` (修改)
 - `docs/plans/2026-03-15-watchlist-indicator-scheduler.md` (详细计划)
 - `task_plan_scheduler.md` (任务跟踪)
+
+### 2026-03-16 - WatchListIndicatorScheduler 完整实现（Phase 4-5 完成）
+
+#### 完成任务
+
+1. **Task 4.4: 手动集成测试** ✅
+   - 修复了 SQLAlchemy DetachedInstanceError 严重问题
+     - 更新 WatchedStocksRepository.list() 返回分离安全的对象
+     - 添加 _is_refresh_needed_with_timestamp() 辅助方法
+   - 执行全面集成测试
+     - 验证调度器使用默认8小时间隔初始化
+     - 验证自定义间隔（12小时）从环境变量正确加载
+     - 使用真实数据库中88只关注股票测试
+     - 后台刷新任务启动和停止正常
+   - 所有21个单元测试通过
+
+2. **Task 5.1: 更新 README 文档** ✅
+   - 在功能特性表中添加"自选股技术指标自动刷新"功能
+   - 创建新章节"🔄 自选股技术指标自动刷新"，包含详细文档：
+     - 工作原理说明
+     - 配置选项表格
+     - GitHub Actions 使用示例
+     - 本地环境配置示例
+     - 注意事项和最佳实践
+   - 在 Secrets/环境变量配置中添加两个新配置项
+
+3. **Task 5.2: 添加内联代码注释** ✅
+   - 在 refresh_if_needed() 中增强注释，解释 DetachedInstanceError 处理
+   - 在 _refresh_all_indicators() 中增强注释，解释批量操作和错误处理
+   - 在 _run_refresh_loop() 中增强注释，解释休眠逻辑和取消处理
+   - 在 start() 中增强注释，解释初始化和后台任务创建
+   - 所有注释保持与现有代码风格一致
+
+#### 技术细节
+
+**SQLAlchemy DetachedInstanceError 修复：**
+
+问题：当 WatchedStocksRepository.list() 返回的 SQLAlchemy 对象在会话关闭后，访问其属性会抛出 DetachedInstanceError。
+
+解决方案：
+```python
+# 修复前
+result = session.execute(select(WatchedStock)...).scalars().all()
+return list(result)  # 返回的对象在会话关闭后无法访问属性
+
+# 修复后
+result = session.execute(select(WatchedStock)...).scalars().all()
+# 创建新的对象实例，复制所有属性
+return [WatchedStock(
+    id=stock.id,
+    user_id=stock.user_id,
+    stock_code=stock.stock_code,
+    # ... 所有其他属性
+) for stock in result]
+```
+
+#### 测试结果
+
+- **单元测试**: 21/21 通过 (100%)
+- **集成测试**: 全面通过
+  - 调度器初始化正常
+  - 后台任务运行正常
+  - 环境变量配置正常
+  - 数据库操作正常
+  - 错误处理正常
+
+#### 代码覆盖率
+
+- WatchListIndicatorScheduler: 82%
+- 新增代码综合覆盖率: 75%
+
+#### 文档更新
+
+- README.md: 添加完整的调度器功能文档
+- task_plan_scheduler.md: 标记所有任务为已完成
+- notes.md: 更新会话摘要
 
 ### 2026-03-15 - Phase 1 完成（调度器服务与测试）
 

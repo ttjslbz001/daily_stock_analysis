@@ -41,6 +41,7 @@
 | **MCP Server** | **AI 集成** | **Model Context Protocol 服务器，让 Claude Code / ChatGPT 等 AI 直接调用分析能力** |
 | 推送 | 多渠道通知 | 企业微信、飞书、Telegram、钉钉、邮件、Pushover |
 | 自动化 | 定时运行 | GitHub Actions 定时执行，无需服务器 |
+| **自选股** | **自动刷新** | **自动刷新技术指标（默认8小时），启动时检查过期数据** |
 
 ### 技术栈与数据来源
 
@@ -144,6 +145,8 @@
 | `AGENT_MAX_STEPS` | Agent 最大推理步数（默认 10） | 可选 |
 | `AGENT_STRATEGY_DIR` | 自定义策略目录（默认内置 `strategies/`） | 可选 |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查（默认 `true`）：非交易日跳过执行；设为 `false` 或使用 `--force-run` 强制执行 | 可选 |
+| `WATCHLIST_AUTO_REFRESH_ENABLED` | 自选股技术指标自动刷新（`true`/`false`，默认 true），启用后定期刷新技术指标 | 可选 |
+| `WATCHLIST_REFRESH_INTERVAL_HOURS` | 自选股技术指标刷新间隔（小时），默认 8 小时，建议范围：4-24 小时 | 可选 |
 
 #### 3. 启用 Actions
 
@@ -233,6 +236,54 @@ python main.py
 领涨: 互联网服务、文化传媒、小金属
 领跌: 保险、航空机场、光伏设备
 ```
+
+## 🔄 自选股技术指标自动刷新
+
+系统支持自动刷新自选股的技术指标，确保数据始终保持最新状态。
+
+### 工作原理
+
+1. **启动时检查**：服务器启动时，检查所有自选股的技术指标缓存时间
+2. **智能刷新**：如果指标超过配置的时间间隔（默认8小时），自动触发刷新
+3. **定时刷新**：后台定时任务每8小时自动刷新一次所有自选股的技术指标
+4. **单股刷新**：用户也可手动刷新单只股票的技术指标（Web界面支持）
+
+### 配置选项
+
+| 环境变量 | 说明 | 默认值 | 推荐值 |
+|---------|------|--------|--------|
+| `WATCHLIST_AUTO_REFRESH_ENABLED` | 是否启用自动刷新 | `true` | `true` |
+| `WATCHLIST_REFRESH_INTERVAL_HOURS` | 刷新间隔（小时） | `8` | `4-12` |
+
+### 使用示例
+
+**GitHub Actions 配置：**
+```yaml
+# 在 Secrets 中添加
+WATCHLIST_AUTO_REFRESH_ENABLED: true
+WATCHLIST_REFRESH_INTERVAL_HOURS: 8
+```
+
+**本地环境配置：**
+```bash
+# 在 .env 文件中添加
+WATCHLIST_AUTO_REFRESH_ENABLED=true
+WATCHLIST_REFRESH_INTERVAL_HOURS=8
+```
+
+**临时关闭自动刷新：**
+```bash
+# 服务器启动时设置环境变量
+WATCHLIST_AUTO_REFRESH_ENABLED=false python main.py
+```
+
+### 注意事项
+
+- 刷新间隔建议设置在 4-12 小时之间，避免过于频繁的数据请求
+- 自动刷新在后台异步执行，不会阻塞主业务流程
+- 单只股票刷新失败不会影响其他股票的刷新
+- 刷新日志会记录在系统日志中，便于排查问题
+
 ## ⚙️ 配置说明
 
 > 📖 完整环境变量、定时任务配置请参考 [完整配置指南](docs/full-guide.md)
