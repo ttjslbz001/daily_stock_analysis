@@ -45,7 +45,7 @@ class TechnicalIndicatorsService:
 
         for code in stock_codes:
             try:
-                # 获取历史数据用于技术指标计算
+                # 获取历史数据用于技术指标计算（90天用于技术指标）
                 history_data = self.stock_service.get_history_data(code, period="daily", days=90)
 
                 if not history_data or not history_data.get("data"):
@@ -65,6 +65,10 @@ class TechnicalIndicatorsService:
 
                 # 获取实时行情
                 quote = self.stock_service.get_realtime_quote(code)
+
+                # 计算一年内最高/最低价
+                year_high = float(df['high'].max()) if len(df) > 0 else 0.0
+                year_low = float(df['low'].min()) if len(df) > 0 else 0.0
 
                 # 构建响应
                 results[code] = {
@@ -86,6 +90,8 @@ class TechnicalIndicatorsService:
                         'rsi12': analysis_result.rsi_12,
                         'rsi24': analysis_result.rsi_24
                     },
+                    'year_high': year_high,
+                    'year_low': year_low,
                     'stock_name': quote.get('stock_name') if quote else code
                 }
 
@@ -140,5 +146,7 @@ class TechnicalIndicatorsService:
                 'rsi12': 0.0,
                 'rsi24': 0.0
             },
-            'stock_name': stock_code
+            'stock_name': stock_code,
+            'year_high': 0.0,
+            'year_low': 0.0
         }

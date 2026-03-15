@@ -10,6 +10,7 @@ import { useAnalysisStore } from '../stores/analysisStore';
 import { ReportSummary } from '../components/report';
 import { HistoryList } from '../components/history';
 import { TaskPanel } from '../components/tasks';
+import { WatchedStocksPanel } from '../components/watchedStocks';
 import { useTaskStream } from '../hooks';
 
 /**
@@ -292,7 +293,7 @@ const HomePage: React.FC = () => {
   return (
     <div
       className="min-h-screen flex flex-col md:grid overflow-hidden w-full"
-      style={{ gridTemplateColumns: 'minmax(12px, 1fr) 256px 24px minmax(auto, 896px) minmax(12px, 1fr)', gridTemplateRows: 'auto 1fr' }}
+      style={{ gridTemplateColumns: 'minmax(12px, 1fr) 256px 24px minmax(auto, 896px) minmax(12px, 1fr)', gridTemplateRows: 'auto auto 1fr' }}
     >
       {/* 顶部输入栏 */}
       <header
@@ -350,8 +351,13 @@ const HomePage: React.FC = () => {
         </div>
       </header>
 
+      {/* 关注股票面板 - 宽行 */}
+      <div className="col-start-2 md:col-end-5 row-start-2 px-3 md:px-0 py-3">
+        <WatchedStocksPanel />
+      </div>
+
       {/* Desktop sidebar */}
-      <div className="hidden md:flex col-start-2 row-start-2 flex-col gap-3 overflow-hidden min-h-0">
+      <div className="hidden md:flex col-start-2 row-start-3 flex-col gap-3 overflow-hidden min-h-0">
         {sidebarContent}
       </div>
 
@@ -369,7 +375,7 @@ const HomePage: React.FC = () => {
       )}
 
       {/* 右侧报告详情 */}
-      <section className="md:col-start-4 md:row-start-2 flex-1 overflow-y-auto overflow-x-auto px-3 md:px-0 md:pl-1 min-w-0 min-h-0">
+      <section className="md:col-start-4 md:row-start-3 flex-1 overflow-y-auto overflow-x-auto px-3 md:px-0 md:pl-1 min-w-0 min-h-0">
         {isLoadingReport ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="w-10 h-10 border-3 border-cyan/20 border-t-cyan rounded-full animate-spin" />

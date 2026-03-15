@@ -38,6 +38,7 @@ from sqlalchemy import (
     and_,
     delete,
     desc,
+    text,
 )
 from sqlalchemy.orm import (
     declarative_base,
@@ -382,7 +383,7 @@ class WatchedStock(Base):
     """
     关注股票表
 
-    存储用户关注的股票列表
+    存储用户关注的股票列表，包含缓存的技术指标
     """
     __tablename__ = 'watched_stocks'
 
@@ -395,6 +396,33 @@ class WatchedStock(Base):
     # 股票信息
     stock_code = Column(String(20), nullable=False)  # 股票代码（如 600519）
     stock_name = Column(String(100))  # 股票名称
+
+    # 缓存的价格数据
+    cached_price = Column(Float)  # 当前价格
+    cached_change = Column(Float)  # 涨跌额
+    cached_change_percent = Column(Float)  # 涨跌幅
+
+    # 缓存的布林线指标
+    cached_bollinger_upper = Column(Float)
+    cached_bollinger_middle = Column(Float)
+    cached_bollinger_lower = Column(Float)
+
+    # 缓存的 MACD 指标
+    cached_macd_dif = Column(Float)
+    cached_macd_dea = Column(Float)
+    cached_macd_bar = Column(Float)
+
+    # 缓存的 RSI 指标
+    cached_rsi6 = Column(Float)
+    cached_rsi12 = Column(Float)
+    cached_rsi24 = Column(Float)
+
+    # 缓存的一年最高/最低价
+    cached_year_high = Column(Float)
+    cached_year_low = Column(Float)
+
+    # 指标缓存时间
+    indicators_cached_at = Column(DateTime)
 
     # 时间戳
     created_at = Column(DateTime, default=datetime.now, nullable=False)
@@ -461,12 +489,53 @@ class DatabaseManager:
         # 创建所有表
         Base.metadata.create_all(self._engine)
 
+        # 执行 schema 迁移（添加新列）
+        self._migrate_watched_stocks_cache()
+
         self._initialized = True
         logger.info(f"数据库初始化完成: {db_url}")
 
         # 注册退出钩子，确保程序退出时关闭数据库连接
         atexit.register(DatabaseManager._cleanup_engine, self._engine)
     
+    def _migrate_watched_stocks_cache(self):
+        """
+        迁移 watched_stocks 表，添加缓存字段
+
+        如果列已存在，SQLite 会忽略，不会报错
+        """
+        cache_columns = [
+            "cached_price REAL",
+            "cached_change REAL",
+            "cached_change_percent REAL",
+            "cached_bollinger_upper REAL",
+            "cached_bollinger_middle REAL",
+            "cached_bollinger_lower REAL",
+            "cached_macd_dif REAL",
+            "cached_macd_dea REAL",
+            "cached_macd_bar REAL",
+            "cached_rsi6 REAL",
+            "cached_rsi12 REAL",
+            "cached_rsi24 REAL",
+            "cached_year_high REAL",
+            "cached_year_low REAL",
+            "indicators_cached_at DATETIME",
+        ]
+
+        with self._engine.connect() as conn:
+            for col_def in cache_columns:
+                col_name = col_def.split()[0]
+                try:
+                    conn.execute(text(f"ALTER TABLE watched_stocks ADD COLUMN {col_def}"))
+                    logger.info(f"添加列 {col_name} 到 watched_stocks 表")
+                except Exception as e:
+                    # 列已存在时会报错，忽略即可
+                    if "duplicate column name" in str(e).lower():
+                        pass
+                    else:
+                        logger.warning(f"添加列 {col_name} 时出错: {e}")
+            conn.commit()
+
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':
         """获取单例实例"""

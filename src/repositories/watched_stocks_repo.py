@@ -202,3 +202,72 @@ class WatchedStocksRepository:
         except Exception as e:
             logger.error(f"获取关注股票记录失败: {e}", exc_info=True)
             return None
+
+    def update_cached_indicators(
+        self,
+        stock_code: str,
+        indicators: dict,
+        user_id: Optional[str] = None
+    ) -> bool:
+        """
+        更新缓存的指标数据
+
+        Args:
+            stock_code: 股票代码
+            indicators: 指标数据字典
+            user_id: 用户 ID（可选，默认使用 'default_user'）
+
+        Returns:
+            是否更新成功
+        """
+        user_id = user_id or self.DEFAULT_USER_ID
+
+        try:
+            with self.db.get_session() as session:
+                watched = session.execute(
+                    select(WatchedStock).where(
+                        and_(WatchedStock.user_id == user_id, WatchedStock.stock_code == stock_code)
+                    )
+                ).scalar_one_or_none()
+
+                if not watched:
+                    logger.warning(f"股票 {stock_code} 不在关注列表中")
+                    return False
+
+                # 更新缓存的指标
+                watched.cached_price = indicators.get('price')
+                watched.cached_change = indicators.get('change')
+                watched.cached_change_percent = indicators.get('change_percent')
+
+                bollinger = indicators.get('bollinger', {})
+                watched.cached_bollinger_upper = bollinger.get('upper')
+                watched.cached_bollinger_middle = bollinger.get('middle')
+                watched.cached_bollinger_lower = bollinger.get('lower')
+
+                macd = indicators.get('macd', {})
+                watched.cached_macd_dif = macd.get('dif')
+                watched.cached_macd_dea = macd.get('dea')
+                watched.cached_macd_bar = macd.get('bar')
+
+                rsi = indicators.get('rsi', {})
+                watched.cached_rsi6 = rsi.get('rsi6')
+                watched.cached_rsi12 = rsi.get('rsi12')
+                watched.cached_rsi24 = rsi.get('rsi24')
+
+                # 一年最高/最低价
+                watched.cached_year_high = indicators.get('year_high')
+                watched.cached_year_low = indicators.get('year_low')
+
+                # 更新股票名称（如果接口返回了）
+                if indicators.get('stock_name'):
+                    watched.stock_name = indicators.get('stock_name')
+
+                watched.indicators_cached_at = datetime.now()
+                watched.updated_at = datetime.now()
+
+                session.commit()
+                return True
+
+        except Exception as e:
+            logger.error(f"更新缓存指标失败: {e}", exc_info=True)
+            return False

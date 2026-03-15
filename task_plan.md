@@ -51,28 +51,28 @@
 - [x] 测试 API 端点
 
 ### Phase 4: 前端类型定义 (10分钟)
-- [ ] 创建 watchedStocks.ts 类型文件
-- [ ] 定义 WatchedStock, BollingerBands, MACD, RSI 接口
-- [ ] 定义请求/响应类型
+- [x] 创建 watchedStocks.ts 类型文件
+- [x] 定义 WatchedStock, BollingerBands, MACD, RSI 接口
+- [x] 定义请求/响应类型
 
 ### Phase 5: 前端 API 服务 (10分钟)
-- [ ] 创建 watchedStocks.ts API 客户端
-- [ ] 实现 getWatchedStocks 方法
-- [ ] 实现 addWatchedStock 方法
-- [ ] 实现 removeWatchedStock 方法
-- [ ] 在 api/index.ts 中导出
+- [x] 创建 watchedStocks.ts API 客户端
+- [x] 实现 getWatchedStocks 方法
+- [x] 实现 addWatchedStock 方法
+- [x] 实现 removeWatchedStock 方法
+- [x] 在 api/index.ts 中导出
 
 ### Phase 6: 前端组件 (40分钟)
-- [ ] 创建 WatchedStockCard 组件
-- [ ] 创建 WatchedStocksPanel 组件
-- [ ] 实现添加/删除功能
-- [ ] 实现刷新功能
-- [ ] 创建组件导出文件
+- [x] 创建 WatchedStockCard 组件
+- [x] 创建 WatchedStocksPanel 组件
+- [x] 实现添加/删除功能
+- [x] 实现刷新功能
+- [x] 创建组件导出文件
 
 ### Phase 7: 集成到主页 (10分钟)
-- [ ] 在 HomePage 中添加 WatchedStocksPanel
-- [ ] 调整布局和样式
-- [ ] 测试集成效果
+- [x] 在 HomePage 中添加 WatchedStocksPanel
+- [x] 调整布局和样式
+- [x] 测试集成效果
 
 ### Phase 8: 测试与验证 (20分钟)
 - [ ] 后端 API 测试
@@ -84,6 +84,22 @@
 - [ ] 响应式布局优化
 - [ ] 样式细节调整
 - [ ] 用户体验改进
+
+## 新功能改进：指标刷新与布局优化
+
+### Phase 10: 单只股票刷新功能 (15分钟)
+- [ ] 在 StockWithLoading 接口中添加 refreshing 状态
+- [ ] 实现 handleRefreshStock 函数，调用 force_refresh=true 的 API
+- [ ] 在指标行右侧添加刷新按钮，带加载状态动画
+- [ ] 测试单只股票刷新功能
+
+### Phase 11: 指标行布局优化 (20-30分钟)
+- [ ] 创建 IndicatorValue 组件，统一指标展示格式
+- [ ] 使用固定宽度的列布局，确保各指标行对齐
+- [ ] 更新表头宽度与指标列匹配
+- [ ] 添加指标之间的分隔线
+- [ ] 优化响应式布局（小屏幕处理）
+- [ ] 测试不同屏幕尺寸下的布局效果
 
 ## 关键问题
 
@@ -109,8 +125,14 @@
 - 进行中: 0
 - 待开始: 25
 
+- **新增任务 (Phase 10-11)**: 10 个任务
+  - 单只股票刷新功能: 4 个任务
+  - 指标行布局优化: 6 个任务
+
 ## 下一步
-从 Phase 4 开始，创建前端类型定义和 API 服务
+1. 完成现有未完成的阶段（Phase 4-9）
+2. 实施 Phase 10: 单只股票刷新功能
+3. 实施 Phase 11: 指标行布局优化
 
 ## 遇到的错误
 - Python 环境缺少依赖包（dotenv、fastapi 等），无法启动服务器进行完整测试

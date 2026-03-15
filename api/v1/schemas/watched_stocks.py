@@ -42,6 +42,8 @@ class WatchedStockResponse(BaseModel):
     current_price: float = Field(..., description="当前价格")
     change: Optional[float] = Field(None, description="涨跌额")
     change_percent: Optional[float] = Field(None, description="涨跌幅（%）")
+    year_high: Optional[float] = Field(None, description="一年内最高价")
+    year_low: Optional[float] = Field(None, description="一年内最低价")
     bollinger: BollingerBands = Field(..., description="布林线指标")
     macd: MACD = Field(..., description="MACD 指标")
     rsi: RSI = Field(..., description="RSI 指标")

@@ -5,14 +5,16 @@
 ===================================
 
 职责：
-1. GET /api/v1/watched - 获取关注股票列表
-2. POST /api/v1/watched - 添加关注股票
-3. DELETE /api/v1/watched/{stock_code} - 取消关注股票
+1. GET /api/v1/watched - 获取关注股票列表（仅基本信息）
+2. GET /api/v1/watched/full - 获取关注股票完整列表（含指标）
+3. GET /api/v1/watched/{stock_code}/indicators - 获取单只股票指标
+4. POST /api/v1/watched - 添加关注股票
+5. DELETE /api/v1/watched/{stock_code} - 取消关注股票
 """
 
 import logging
-from typing import List
-from datetime import datetime
+from typing import List, Optional
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -34,66 +36,79 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 DEFAULT_USER_ID = "default_user"
+CACHE_DURATION_HOURS = 12  # 缓存有效期：12小时
+
+
+def _is_cache_valid(watched_stock) -> bool:
+    """检查缓存是否有效（12小时内）"""
+    if not watched_stock.indicators_cached_at:
+        return False
+    return watched_stock.indicators_cached_at > datetime.now() - timedelta(hours=CACHE_DURATION_HOURS)
+
+
+def _build_response_from_cache(watched_stock) -> WatchedStockResponse:
+    """从缓存构建响应"""
+    return WatchedStockResponse(
+        stock_code=watched_stock.stock_code,
+        stock_name=watched_stock.stock_name or watched_stock.stock_code,
+        current_price=watched_stock.cached_price or 0.0,
+        change=watched_stock.cached_change,
+        change_percent=watched_stock.cached_change_percent,
+        year_high=watched_stock.cached_year_high,
+        year_low=watched_stock.cached_year_low,
+        bollinger=BollingerBands(
+            upper=watched_stock.cached_bollinger_upper or 0.0,
+            middle=watched_stock.cached_bollinger_middle or 0.0,
+            lower=watched_stock.cached_bollinger_lower or 0.0
+        ),
+        macd=MACD(
+            dif=watched_stock.cached_macd_dif or 0.0,
+            dea=watched_stock.cached_macd_dea or 0.0,
+            bar=watched_stock.cached_macd_bar or 0.0
+        ),
+        rsi=RSI(
+            rsi6=watched_stock.cached_rsi6 or 0.0,
+            rsi12=watched_stock.cached_rsi12 or 0.0,
+            rsi24=watched_stock.cached_rsi24 or 0.0
+        ),
+        updated_at=watched_stock.indicators_cached_at or datetime.now()
+    )
 
 
 @router.get(
     "",
     response_model=WatchedStocksListResponse,
-    summary="获取关注股票列表",
-    description="获取当前用户的关注股票列表，包含实时价格和技术指标"
+    summary="获取关注股票列表（轻量）",
+    description="获取当前用户的关注股票列表，仅包含基本信息，不包含技术指标"
 )
 def get_watched_stocks():
     """
-    获取关注股票列表
+    获取关注股票列表（轻量版，快速返回）
 
-    返回用户关注的股票列表，包含实时价格、涨跌幅和各类技术指标（布林线、MACD、RSI）
+    返回用户关注的股票列表，仅包含代码和名称，不包含价格和指标
+    前端应单独调用 /{stock_code}/indicators 获取每只股票的详细数据
     """
     try:
         repo = WatchedStocksRepository()
-        indicator_service = TechnicalIndicatorsService()
-
-        # 获取关注的股票
         watched = repo.list(DEFAULT_USER_ID)
-        stock_codes = [ws.stock_code for ws in watched]
 
-        if not stock_codes:
+        if not watched:
             return WatchedStocksListResponse(total=0, items=[])
 
-        # 批量获取技术指标
-        indicators = indicator_service.get_indicators(stock_codes)
-
-        # 构建响应
+        # 返回基本信息，不获取指标
         items = []
         for ws in watched:
-            code = ws.stock_code
-            data = indicators.get(code, {})
-
-            # 确保所有必需字段都有值
-            bollinger_data = data.get('bollinger', {})
-            macd_data = data.get('macd', {})
-            rsi_data = data.get('rsi', {})
-
             items.append(WatchedStockResponse(
-                stock_code=code,
-                stock_name=data.get('stock_name', ws.stock_name or code),
-                current_price=data.get('price', 0.0),
-                change=data.get('change'),
-                change_percent=data.get('change_percent'),
-                bollinger=BollingerBands(
-                    upper=bollinger_data.get('upper', 0.0),
-                    middle=bollinger_data.get('middle', 0.0),
-                    lower=bollinger_data.get('lower', 0.0)
-                ),
-                macd=MACD(
-                    dif=macd_data.get('dif', 0.0),
-                    dea=macd_data.get('dea', 0.0),
-                    bar=macd_data.get('bar', 0.0)
-                ),
-                rsi=RSI(
-                    rsi6=rsi_data.get('rsi6', 0.0),
-                    rsi12=rsi_data.get('rsi12', 0.0),
-                    rsi24=rsi_data.get('rsi24', 0.0)
-                ),
+                stock_code=ws.stock_code,
+                stock_name=ws.stock_name or ws.stock_code,
+                current_price=0.0,
+                change=None,
+                change_percent=None,
+                year_high=None,
+                year_low=None,
+                bollinger=BollingerBands(upper=0.0, middle=0.0, lower=0.0),
+                macd=MACD(dif=0.0, dea=0.0, bar=0.0),
+                rsi=RSI(rsi6=0.0, rsi12=0.0, rsi24=0.0),
                 updated_at=ws.updated_at or datetime.now()
             ))
 
@@ -104,6 +119,98 @@ def get_watched_stocks():
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"获取关注股票列表失败: {str(e)}"}
+        )
+
+
+@router.get(
+    "/{stock_code}/indicators",
+    response_model=WatchedStockResponse,
+    summary="获取单只股票的技术指标",
+    description="获取指定股票的实时价格和技术指标（支持12小时缓存）"
+)
+def get_stock_indicators(
+    stock_code: str,
+    force_refresh: bool = Query(False, description="强制刷新，忽略缓存")
+):
+    """
+    获取单只股票的技术指标
+
+    返回指定股票的实时价格、涨跌幅和技术指标
+    如果缓存有效（12小时内）且 force_refresh=False，直接返回缓存数据
+    """
+    try:
+        repo = WatchedStocksRepository()
+
+        # 获取股票信息
+        watched_stock = repo.get_by_code(stock_code, DEFAULT_USER_ID)
+        if not watched_stock:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "not_found", "message": "股票不在关注列表中"}
+            )
+
+        # 检查缓存是否有效
+        if not force_refresh and _is_cache_valid(watched_stock):
+            logger.debug(f"使用缓存数据: {stock_code}")
+            return _build_response_from_cache(watched_stock)
+
+        # 获取新的技术指标
+        logger.info(f"获取新鲜指标: {stock_code}")
+        indicator_service = TechnicalIndicatorsService()
+        indicators = indicator_service.get_indicators([stock_code])
+        data = indicators.get(stock_code, {})
+
+        bollinger_data = data.get('bollinger', {})
+        macd_data = data.get('macd', {})
+        rsi_data = data.get('rsi', {})
+
+        # 更新缓存
+        cache_data = {
+            'price': data.get('price', 0.0),
+            'change': data.get('change'),
+            'change_percent': data.get('change_percent'),
+            'stock_name': data.get('stock_name'),
+            'bollinger': bollinger_data,
+            'macd': macd_data,
+            'rsi': rsi_data,
+            'year_high': data.get('year_high'),
+            'year_low': data.get('year_low'),
+        }
+        repo.update_cached_indicators(stock_code, cache_data, DEFAULT_USER_ID)
+
+        return WatchedStockResponse(
+            stock_code=stock_code,
+            stock_name=data.get('stock_name', watched_stock.stock_name or stock_code),
+            current_price=data.get('price', 0.0),
+            change=data.get('change'),
+            change_percent=data.get('change_percent'),
+            year_high=data.get('year_high'),
+            year_low=data.get('year_low'),
+            bollinger=BollingerBands(
+                upper=bollinger_data.get('upper', 0.0),
+                middle=bollinger_data.get('middle', 0.0),
+                lower=bollinger_data.get('lower', 0.0)
+            ),
+            macd=MACD(
+                dif=macd_data.get('dif', 0.0),
+                dea=macd_data.get('dea', 0.0),
+                bar=macd_data.get('bar', 0.0)
+            ),
+            rsi=RSI(
+                rsi6=rsi_data.get('rsi6', 0.0),
+                rsi12=rsi_data.get('rsi12', 0.0),
+                rsi24=rsi_data.get('rsi24', 0.0)
+            ),
+            updated_at=datetime.now()
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取股票指标失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": f"获取股票指标失败: {str(e)}"}
         )
 
 
@@ -123,7 +230,7 @@ def add_watched_stock(request: AddWatchedStockRequest):
         repo = WatchedStocksRepository()
 
         # 检查是否已存在
-        if repo.exists(DEFAULT_USER_ID, request.stock_code):
+        if repo.exists(request.stock_code, DEFAULT_USER_ID):
             return AddWatchedStockResponse(
                 success=False,
                 message="股票已在关注列表中",
@@ -170,7 +277,7 @@ def remove_watched_stock(stock_code: str):
         repo = WatchedStocksRepository()
 
         # 检查是否存在
-        if not repo.exists(DEFAULT_USER_ID, stock_code):
+        if not repo.exists(stock_code, DEFAULT_USER_ID):
             raise HTTPException(
                 status_code=404,
                 detail={"error": "not_found", "message": "股票不在关注列表中"}

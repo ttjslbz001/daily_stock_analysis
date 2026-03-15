@@ -25,3 +25,6 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+// Export API clients for convenience
+export * from './watchedStocks';
