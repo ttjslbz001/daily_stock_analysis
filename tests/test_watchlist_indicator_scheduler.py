@@ -257,6 +257,83 @@ class WatchListIndicatorSchedulerTestCase(unittest.TestCase):
 
         self.assertEqual(scheduler.user_id, 'custom_user')
 
+    def test_default_refresh_interval_from_env(self) -> None:
+        """Test that default refresh interval is read from environment variable."""
+        import os
+
+        # Save original value
+        original_value = os.environ.get('WATCHLIST_REFRESH_INTERVAL_HOURS')
+
+        try:
+            # Set environment variable
+            os.environ['WATCHLIST_REFRESH_INTERVAL_HOURS'] = '12'
+
+            # Create scheduler without specifying refresh_interval_hours
+            scheduler = WatchListIndicatorScheduler(
+                repo=self.mock_repo,
+                indicators_service=self.mock_indicators_service,
+            )
+
+            # Should use value from environment variable
+            self.assertEqual(scheduler.refresh_interval_hours, 12)
+        finally:
+            # Restore original value
+            if original_value is None:
+                os.environ.pop('WATCHLIST_REFRESH_INTERVAL_HOURS', None)
+            else:
+                os.environ['WATCHLIST_REFRESH_INTERVAL_HOURS'] = original_value
+
+    def test_default_refresh_interval_when_env_not_set(self) -> None:
+        """Test that default refresh interval is 8 when env variable not set."""
+        import os
+
+        # Save original value
+        original_value = os.environ.get('WATCHLIST_REFRESH_INTERVAL_HOURS')
+
+        try:
+            # Remove environment variable
+            os.environ.pop('WATCHLIST_REFRESH_INTERVAL_HOURS', None)
+
+            # Create scheduler without specifying refresh_interval_hours
+            scheduler = WatchListIndicatorScheduler(
+                repo=self.mock_repo,
+                indicators_service=self.mock_indicators_service,
+            )
+
+            # Should use default value of 8
+            self.assertEqual(scheduler.refresh_interval_hours, 8)
+        finally:
+            # Restore original value
+            if original_value is not None:
+                os.environ['WATCHLIST_REFRESH_INTERVAL_HOURS'] = original_value
+
+    def test_explicit_refresh_interval_overrides_env(self) -> None:
+        """Test that explicit refresh_interval parameter overrides environment variable."""
+        import os
+
+        # Save original value
+        original_value = os.environ.get('WATCHLIST_REFRESH_INTERVAL_HOURS')
+
+        try:
+            # Set environment variable to a different value
+            os.environ['WATCHLIST_REFRESH_INTERVAL_HOURS'] = '12'
+
+            # Create scheduler with explicit refresh_interval_hours
+            scheduler = WatchListIndicatorScheduler(
+                repo=self.mock_repo,
+                indicators_service=self.mock_indicators_service,
+                refresh_interval_hours=6,
+            )
+
+            # Should use explicit value, not environment variable
+            self.assertEqual(scheduler.refresh_interval_hours, 6)
+        finally:
+            # Restore original value
+            if original_value is None:
+                os.environ.pop('WATCHLIST_REFRESH_INTERVAL_HOURS', None)
+            else:
+                os.environ['WATCHLIST_REFRESH_INTERVAL_HOURS'] = original_value
+
 
 if __name__ == '__main__':
     unittest.main()

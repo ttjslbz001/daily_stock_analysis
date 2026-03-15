@@ -12,6 +12,7 @@ Watch List Indicator Scheduler
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -32,7 +33,7 @@ class WatchListIndicatorScheduler:
         self,
         repo: WatchedStocksRepository,
         indicators_service: TechnicalIndicatorsService,
-        refresh_interval_hours: int = 8,
+        refresh_interval_hours: Optional[int] = None,
         user_id: str = 'default_user',
     ):
         """
@@ -41,12 +42,17 @@ class WatchListIndicatorScheduler:
         Args:
             repo: WatchedStocksRepository instance for database operations
             indicators_service: TechnicalIndicatorsService for fetching indicators
-            refresh_interval_hours: Number of hours between refreshes (default: 8)
+            refresh_interval_hours: Number of hours between refreshes (default from env or 8)
             user_id: User ID to fetch watch list for (default: 'default_user')
         """
         self.repo = repo
         self.indicators_service = indicators_service
-        self.refresh_interval_hours = refresh_interval_hours
+        # Read from environment variable if not provided, otherwise use default
+        self.refresh_interval_hours = (
+            refresh_interval_hours
+            if refresh_interval_hours is not None
+            else int(os.getenv('WATCHLIST_REFRESH_INTERVAL_HOURS', '8'))
+        )
         self.user_id = user_id
 
         # Background task reference

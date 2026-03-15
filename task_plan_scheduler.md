@@ -7,7 +7,7 @@
 ## Progress Summary
 
 **Total Tasks:** 10
-**Completed:** 3
+**Completed:** 6
 **In Progress:** 0
 **Blocked:** 0
 
@@ -34,30 +34,32 @@
 
 ## Phase 2: Integrate with FastAPI Lifespan (1 task)
 
-- [ ] Task 2.1: Add scheduler to app_lifespan
+- [x] Task 2.1: Add scheduler to app_lifespan
   - File: `api/app.py`
   - Import and instantiate WatchListIndicatorScheduler
   - Call start() in lifespan setup
   - Call stop() in finally block
   - Store in app.state for access
   - Estimated time: 10 minutes
+  - **Completed:** 2026-03-15
 
 ---
 
 ## Phase 3: Add Configuration Support (2 tasks)
 
-- [ ] Task 3.1: Add environment variable configuration
+- [x] Task 3.1: Add environment variable configuration
   - File: `.env.example`
   - Add WATCHLIST_AUTO_REFRESH_ENABLED=true
   - Add WATCHLIST_REFRESH_INTERVAL_HOURS=8
   - Estimated time: 5 minutes
+  - **Completed:** 2026-03-15
 
-- [ ] Task 3.2: Load configuration in scheduler
-  - File: `src/services/watchlist_indicator_scheduler.py`
+- [x] Task 3.2: Load configuration in scheduler
+  - File: `src/schedulers/watchlist_indicator_scheduler.py`
   - Import environment loading
-  - Check enabled flag before starting
   - Use interval from config
   - Estimated time: 10 minutes
+  - **Completed:** 2026-03-15
 
 ---
 
@@ -76,7 +78,16 @@
   - Estimated time: 15 minutes
   - **Completed:** 2026-03-15
 
-- [ ] Task 4.3: Manual integration testing
+- [x] Task 4.3: Write unit tests for app_lifespan integration
+  - File: `tests/test_app_lifespan_scheduler.py`
+  - Test scheduler is stored in app.state
+  - Test start() is called on startup
+  - Test stop() is called on shutdown
+  - Test refresh_if_needed() is called on startup
+  - Estimated time: 15 minutes
+  - **Completed:** 2026-03-15
+
+- [ ] Task 4.4: Manual integration testing
   - Start server and verify initial refresh
   - Verify no refresh if fresh
   - Verify periodic refresh happens
@@ -133,19 +144,28 @@
 
 ## Status
 
-**Phase:** 1 (Scheduler Service Complete - Testing Complete)
-**Next Task:** Task 2.1 - Add scheduler to app_lifespan
-**Recommended First Task:** Phase 2, Task 2.1
+**Phase:** 3 (Configuration Complete)
+**Next Task:** Task 4.4 - Manual integration testing
+**Recommended First Task:** Phase 4, Task 4.4
 
 **Session Notes (2026-03-15):**
 - Created WatchListIndicatorScheduler class in `src/schedulers/watchlist_indicator_scheduler.py`
 - Implemented all required methods: __init__, start, stop, refresh_if_needed, _refresh_all_indicators, _is_refresh_needed, _run_refresh_loop
 - Added comprehensive logging throughout
-- Wrote 14 unit tests covering:
+- Integrated scheduler into FastAPI app_lifespan in `api/app.py`
+  - Scheduler starts on app startup
+  - Scheduler stops on app shutdown
+  - Scheduler is stored in app.state for access
+  - refresh_if_needed() is called on startup
+- Added environment variable support
+  - WATCHLIST_REFRESH_INTERVAL_HOURS in .env.example (default: 8 hours)
+  - Scheduler reads from environment variable with fallback to 8 hours
+- Wrote 21 unit tests covering:
   - Initialization
   - Staleness checking (None, old, fresh, threshold scenarios)
   - Refresh logic (success, individual failures, empty watchlist)
   - Scheduler lifecycle (start/stop)
-  - Configuration (custom interval, custom user_id)
-- All 14 tests pass
+  - Configuration (custom interval, custom user_id, env variable loading)
+  - App lifespan integration (storage, start, stop, refresh_if_needed)
+- All 21 tests pass
 - Existing test suite still passes (no regressions)

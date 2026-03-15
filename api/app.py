@@ -32,6 +32,9 @@ from api.middlewares.auth import add_auth_middleware
 from api.middlewares.error_handler import add_error_handlers
 from api.v1.schemas.common import HealthResponse
 from src.mcp import setup_mcp
+from src.repositories.watched_stocks_repo import WatchedStocksRepository
+from src.schedulers.watchlist_indicator_scheduler import WatchListIndicatorScheduler
+from src.services.technical_indicators_service import TechnicalIndicatorsService
 from src.services.system_config_service import SystemConfigService
 
 
@@ -39,9 +42,24 @@ from src.services.system_config_service import SystemConfigService
 async def app_lifespan(app: FastAPI):
     """Initialize and release shared services for the app lifecycle."""
     app.state.system_config_service = SystemConfigService()
+
+    # Initialize Watch List Indicator Scheduler
+    app.state.watchlist_indicator_scheduler = WatchListIndicatorScheduler(
+        repo=WatchedStocksRepository(),
+        indicators_service=TechnicalIndicatorsService(),
+    )
+
+    # Start the scheduler on startup
+    await app.state.watchlist_indicator_scheduler.start()
+
     try:
         yield
     finally:
+        # Stop the scheduler on shutdown
+        if hasattr(app.state, "watchlist_indicator_scheduler"):
+            await app.state.watchlist_indicator_scheduler.stop()
+            delattr(app.state, "watchlist_indicator_scheduler")
+
         if hasattr(app.state, "system_config_service"):
             delattr(app.state, "system_config_service")
 
