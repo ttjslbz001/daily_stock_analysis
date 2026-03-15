@@ -11,6 +11,16 @@ interface BasicStock {
   updated_at: string;
 }
 
+// 格式化成交量
+const formatVolume = (volume: number): string => {
+  if (volume >= 100000000) {
+    return (volume / 100000000).toFixed(2) + '亿';
+  } else if (volume >= 10000) {
+    return (volume / 10000).toFixed(2) + '万';
+  }
+  return volume.toLocaleString();
+};
+
 // 加载状态
 interface StockWithLoading extends WatchedStock {
   loading?: boolean;
@@ -59,6 +69,8 @@ export const WatchedStocksPanel: React.FC = () => {
         bollinger: { upper: 0, middle: 0, lower: 0 },
         macd: { dif: 0, dea: 0, bar: 0 },
         rsi: { rsi6: 0, rsi12: 0, rsi24: 0 },
+        kdj: { k: 0, d: 0, j: 0 },
+        volume: 0,
         year_high: undefined,
         year_low: undefined,
         updated_at: s.updated_at,
@@ -315,7 +327,9 @@ export const WatchedStocksPanel: React.FC = () => {
             </svg>
           </button>
           <div>
-            <span className="text-sm font-medium text-white">{stock.stock_name || stock.stock_code}</span>
+            <span className="text-sm font-medium text-white">
+              {stock.stock_name && stock.stock_name !== stock.stock_code ? stock.stock_name : ''}
+            </span>
             <span className="text-xs text-muted ml-2">{stock.stock_code}</span>
           </div>
         </div>
@@ -374,6 +388,23 @@ export const WatchedStocksPanel: React.FC = () => {
                 { value: stock.rsi.rsi12.toFixed(0), color: 'text-secondary' },
                 { value: stock.rsi.rsi24.toFixed(0), color: 'text-secondary' }
               ]}
+            />
+            <div className="w-px h-6 bg-white/10" />
+            <IndicatorValue
+              label="KDJ"
+              values={[
+                { value: stock.kdj.k.toFixed(0), color: 'text-secondary' },
+                { value: stock.kdj.d.toFixed(0), color: 'text-secondary' },
+                { value: stock.kdj.j.toFixed(0), color: stock.kdj.j >= stock.kdj.k ? 'text-red-400' : 'text-green-400' }
+              ]}
+            />
+            <div className="w-px h-6 bg-white/10" />
+            <IndicatorValue
+              label="成交量"
+              values={[{
+                value: stock.volume > 0 ? formatVolume(stock.volume) : '-',
+                color: 'text-secondary'
+              }]}
             />
             <div className="w-px h-6 bg-white/10" />
             <IndicatorValue
@@ -461,6 +492,8 @@ export const WatchedStocksPanel: React.FC = () => {
           <div className="min-w-[140px]">布林线 (上/中/下)</div>
           <div className="min-w-[140px]">MACD</div>
           <div className="min-w-[140px]">RSI (6/12/24)</div>
+          <div className="min-w-[140px]">KDJ (K/D/J)</div>
+          <div className="min-w-[140px]">成交量</div>
           <div className="min-w-[140px]">年高/低</div>
           <div className="w-8" /> {/* 刷新按钮占位 */}
         </div>

@@ -26,6 +26,13 @@ export interface RSI {
   rsi24: number;  // RSI(24) 长期
 }
 
+/** KDJ 指标 */
+export interface KDJ {
+  k: number;  // K 值
+  d: number;  // D 值
+  j: number;  // J 值
+}
+
 // ============ 响应类型 ============
 
 /** 关注股票响应 */
@@ -40,6 +47,8 @@ export interface WatchedStock {
   bollinger: BollingerBands; // 布林线指标
   macd: MACD;              // MACD 指标
   rsi: RSI;                // RSI 指标
+  kdj: KDJ;                // KDJ 指标
+  volume: number;          // 当日成交量
   updated_at: string;      // 更新时间
 }
 

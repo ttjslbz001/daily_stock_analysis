@@ -1,0 +1,161 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # 每周一凌晨2点运行
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 依赖漏洞扫描
+  dependency-check:
+    name: 🔍 Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install safety bandit semgrep
+
+      - name: 🔴 Safety scan (known vulnerabilities)
+        run: |
+          echo "## 🔍 Safety 扫描结果" >> $GITHUB_STEP_SUMMARY
+          safety check --json --output safety-report.json || true
+          safety check || true
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          cat safety-report.json 2>/dev/null || echo "Safety scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🛡️ Bandit SAST scan (security issues)
+        run: |
+          echo "## 🛡️ Bandit SAST 扫描结果" >> $GITHUB_STEP_SUMMARY
+          bandit -r src/ api/ -f json -o bandit-report.json || true
+          bandit -r src/ api/ -f screen || true
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          cat bandit-report.json 2>/dev/null || echo "Bandit scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Semgrep SAST scan
+        run: |
+          echo "## 📊 Semgrep 扫描结果" >> $GITHUB_STEP_SUMMARY
+          semgrep --config=auto --json --output=semgrep-report.json src/ api/ || true
+          echo "```" >> $GITHUB_STEP_SUMMARY
+          cat semgrep-report.json 2>/dev/null || echo "Semgrep scan completed" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📤 Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            safety-report.json
+            bandit-report.json
+            semgrep-report.json
+          retention-days: 30
+
+  # 密钥泄露检测
+  secret-scan:
+    name: 🔐 Secret Leak Detection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔑 TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha || github.event.before }}
+          head: HEAD
+          extra_args: --only-verified --fail
+
+      - name: 📋 Summary
+        if: failure()
+        run: |
+          echo "## 🔐 密钥扫描失败" >> $GITHUB_STEP_SUMMARY
+          echo "检测到可能泄露的密钥，请立即检查提交内容。" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 建议操作" >> $GITHUB_STEP_SUMMARY
+          echo "1. 立即撤销已泄露的密钥" >> $GITHUB_STEP_SUMMARY
+          echo "2. 使用 `git filter-branch` 或 BFG 清除历史" >> $GITHUB_STEP_SUMMARY
+          echo "3. 确保敏感信息添加到 .gitignore" >> $GITHUB_STEP_SUMMARY
+          exit 1
+
+  # CodeQL 扫描
+  codeql:
+    name: 🧪 CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python', 'javascript']
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🧪 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: 🏗️ Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # 依赖过期检查
+  outdated-check:
+    name: 📦 Outdated Dependencies Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install pip-outdated
+        run: pip install pip-outdated
+
+      - name: 🔍 Check outdated packages
+        run: |
+          echo "## 📦 过期依赖检查" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          pip-outdated --format=json || true
+          echo '```' >> $GITHUB_STEP_SUMMARY

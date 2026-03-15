@@ -254,6 +254,15 @@ class WatchedStocksRepository:
                 watched.cached_rsi12 = rsi.get('rsi12')
                 watched.cached_rsi24 = rsi.get('rsi24')
 
+                # KDJ 指标
+                kdj = indicators.get('kdj', {})
+                watched.cached_kdj_k = kdj.get('k')
+                watched.cached_kdj_d = kdj.get('d')
+                watched.cached_kdj_j = kdj.get('j')
+
+                # 成交量
+                watched.cached_volume = indicators.get('volume')
+
                 # 一年最高/最低价
                 watched.cached_year_high = indicators.get('year_high')
                 watched.cached_year_low = indicators.get('year_low')

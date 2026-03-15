@@ -27,6 +27,7 @@ from api.v1.schemas.watched_stocks import (
     BollingerBands,
     MACD,
     RSI,
+    KDJ,
 )
 from src.repositories.watched_stocks_repo import WatchedStocksRepository
 from src.services.technical_indicators_service import TechnicalIndicatorsService
@@ -71,6 +72,12 @@ def _build_response_from_cache(watched_stock) -> WatchedStockResponse:
             rsi12=watched_stock.cached_rsi12 or 0.0,
             rsi24=watched_stock.cached_rsi24 or 0.0
         ),
+        kdj=KDJ(
+            k=watched_stock.cached_kdj_k or 0.0,
+            d=watched_stock.cached_kdj_d or 0.0,
+            j=watched_stock.cached_kdj_j or 0.0
+        ),
+        volume=watched_stock.cached_volume or 0.0,
         updated_at=watched_stock.indicators_cached_at or datetime.now()
     )
 
@@ -109,6 +116,8 @@ def get_watched_stocks():
                 bollinger=BollingerBands(upper=0.0, middle=0.0, lower=0.0),
                 macd=MACD(dif=0.0, dea=0.0, bar=0.0),
                 rsi=RSI(rsi6=0.0, rsi12=0.0, rsi24=0.0),
+                kdj=KDJ(k=0.0, d=0.0, j=0.0),
+                volume=0.0,
                 updated_at=ws.updated_at or datetime.now()
             ))
 
@@ -163,6 +172,7 @@ def get_stock_indicators(
         bollinger_data = data.get('bollinger', {})
         macd_data = data.get('macd', {})
         rsi_data = data.get('rsi', {})
+        kdj_data = data.get('kdj', {})
 
         # 更新缓存
         cache_data = {
@@ -173,6 +183,8 @@ def get_stock_indicators(
             'bollinger': bollinger_data,
             'macd': macd_data,
             'rsi': rsi_data,
+            'kdj': kdj_data,
+            'volume': data.get('volume'),
             'year_high': data.get('year_high'),
             'year_low': data.get('year_low'),
         }
@@ -201,6 +213,12 @@ def get_stock_indicators(
                 rsi12=rsi_data.get('rsi12', 0.0),
                 rsi24=rsi_data.get('rsi24', 0.0)
             ),
+            kdj=KDJ(
+                k=kdj_data.get('k', 0.0),
+                d=kdj_data.get('d', 0.0),
+                j=kdj_data.get('j', 0.0)
+            ),
+            volume=data.get('volume', 0.0),
             updated_at=datetime.now()
         )
 
