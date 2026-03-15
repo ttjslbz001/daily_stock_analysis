@@ -450,3 +450,124 @@ api/v1/endpoints/
    - 连续快速点击刷新按钮
    - 网络错误处理
    - 多只股票同时刷新
+
+---
+
+## 关注股票指标定时刷新功能
+
+### 2026-03-15 - 规划阶段
+
+#### 功能需求
+
+创建一个定时任务，自动刷新关注股票的技术指标：
+
+1. **刷新间隔**: 每 8 小时自动刷新一次
+2. **启动行为**: 服务器启动时，如果指标缓存时间超过 8 小时，立即刷新
+3. **刷新方式**: 使用现有的 `TechnicalIndicatorsService` 批量获取指标
+4. **错误处理**: 单个股票刷新失败不影响其他股票，记录错误日志
+
+#### 技术设计
+
+##### 架构方案
+
+使用 FastAPI 的 `lifespan` 事件和 `asyncio` 后台任务：
+
+```
+FastAPI Startup
+    └─> WatchListIndicatorScheduler.start()
+         └─> asyncio.create_task(_run_refresh_loop())
+              ├─> Initial: refresh_if_needed()
+              ├─> Wait 8 hours
+              └─> Loop: refresh_all_indicators() -> Wait 8 hours
+```
+
+##### 组件设计
+
+1. **WatchListIndicatorScheduler** (`src/services/watchlist_indicator_scheduler.py`)
+   - `_run_refresh_loop()`: 异步循环，每 8 小时触发一次刷新
+   - `refresh_if_needed()`: 检查并刷新过期指标
+   - `_refresh_all_indicators()`: 批量刷新所有关注股票
+   - `_is_refresh_needed()`: 检查指标是否过期
+   - `start()`: 启动后台任务
+   - `stop()`: 取消后台任务
+
+2. **FastAPI Lifespan 集成** (`api/app.py`)
+   - 在 `app_lifespan()` 中启动和停止调度器
+
+3. **配置支持**
+   - `WATCHLIST_AUTO_REFRESH_ENABLED`: 是否启用自动刷新（默认: true）
+   - `WATCHLIST_REFRESH_INTERVAL_HOURS`: 刷新间隔小时数（默认: 8）
+
+##### 数据库依赖
+
+- `WatchedStock.indicators_cached_at`: 记录指标缓存时间
+- `WatchedStocksRepository.list()`: 获取所有关注股票
+- `WatchedStocksRepository.update_cached_indicators()`: 更新指标缓存
+
+##### 服务依赖
+
+- `TechnicalIndicatorsService.get_indicators()`: 批量获取技术指标
+
+#### 实施计划
+
+**Phase 1: 创建调度器服务** (2 任务)
+- Task 1.1: 创建 WatchListIndicatorScheduler 类（15-20分钟）
+- Task 1.2: 实现过期检查逻辑（10分钟）
+
+**Phase 2: 集成到 FastAPI** (1 任务)
+- Task 2.1: 添加到 app_lifespan（10分钟）
+
+**Phase 3: 配置支持** (2 任务)
+- Task 3.1: 添加环境变量配置（5分钟）
+- Task 3.2: 加载配置（10分钟）
+
+**Phase 4: 测试** (3 任务)
+- Task 4.1: 过期检查单元测试（15分钟）
+- Task 4.2: 刷新逻辑单元测试（15分钟）
+- Task 4.3: 手动集成测试（20分钟）
+
+**Phase 5: 文档** (2 任务)
+- Task 5.1: 更新 README（10分钟）
+- Task 5.2: 添加代码注释（10分钟）
+
+#### 设计决策
+
+1. **刷新策略**: 滑动窗口（从上次成功刷新时间开始计算）
+   - 优势: 灵活适应不同启动时间
+   - 劣势: 刷新时间不固定
+
+2. **启动刷新**: 只在指标过期时刷新
+   - 优势: 避免不必要的刷新，加快启动速度
+   - 劣势: 首次启动可能显示旧数据（如果未过期）
+
+3. **技术选型**: asyncio 后台任务
+   - 优势: 与 FastAPI 原生集成，不阻塞事件循环
+   - 劣势: 需要处理异步取消
+
+4. **服务复用**: 使用现有 TechnicalIndicatorsService
+   - 优势: 避免代码重复，利用已有优化
+   - 劣势: 依赖服务层的实现
+
+#### 错误处理策略
+
+1. **单个股票失败**: 记录日志，继续处理其他股票
+2. **数据库错误**: 记录日志，不启动调度器
+3. **调度循环异常**: 捕获异常，继续循环（不崩溃）
+
+#### 配置示例
+
+```bash
+# .env
+WATCHLIST_AUTO_REFRESH_ENABLED=true
+WATCHLIST_REFRESH_INTERVAL_HOURS=8
+```
+
+#### 相关文件
+
+- `src/services/watchlist_indicator_scheduler.py` (新建)
+- `api/app.py` (修改)
+- `.env.example` (修改)
+- `tests/test_watchlist_indicator_scheduler.py` (新建)
+- `README.md` (修改)
+- `docs/plans/2026-03-15-watchlist-indicator-scheduler.md` (详细计划)
+- `task_plan_scheduler.md` (任务跟踪)
