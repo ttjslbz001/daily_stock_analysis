@@ -28,9 +28,16 @@
 - ✅ Phase 1-7: 数据库层、后端核心逻辑、后端 API、前端类型定义、前端 API 服务、前端组件、集成到主页
 - ✅ Phase 10-11: 单只股票刷新功能、指标行布局优化
 
+#### 4. WatchListIndicatorScheduler (Phase 1 完成)
+- ✅ Phase 1, Task 1.1: 创建 WatchListIndicatorScheduler 类
+- ✅ Phase 1, Task 1.2: 实现过期检查逻辑
+- ✅ Task 4.1: 编写过期检查单元测试（14个测试）
+- ✅ Task 4.2: 编写刷新逻辑单元测试
+- 测试覆盖率: 75% (新增代码)
+
 ### Git 状态
 - 工作区干净，无待提交的更改
-- 最近提交：`22eb115 feat: add frontend testing infrastructure and test scripts`
+- 最近提交：`e3c893e feat: implement WatchListIndicatorScheduler for automatic indicator refresh`
 
 ### 可用命令
 
@@ -571,3 +578,81 @@ WATCHLIST_REFRESH_INTERVAL_HOURS=8
 - `README.md` (修改)
 - `docs/plans/2026-03-15-watchlist-indicator-scheduler.md` (详细计划)
 - `task_plan_scheduler.md` (任务跟踪)
+
+### 2026-03-15 - Phase 1 完成（调度器服务与测试）
+
+#### 完成任务
+
+1. **Task 1.1: 创建 WatchListIndicatorScheduler 类** ✅
+   - 文件: `src/schedulers/watchlist_indicator_scheduler.py`
+   - 实现所有方法:
+     - `__init__`: 初始化调度器
+     - `start()`: 启动后台刷新循环
+     - `stop()`: 停止后台任务
+     - `refresh_if_needed()`: 检查并刷新过期指标
+     - `_refresh_all_indicators()`: 批量刷新所有关注股票
+     - `_is_refresh_needed()`: 检查指标是否过期
+     - `_run_refresh_loop()`: 异步刷新循环
+   - 添加全面的日志记录
+
+2. **Task 1.2: 实现过期检查逻辑** ✅
+   - 检查 `indicators_cached_at` 对比 8 小时阈值
+   - 处理 None 值（从未缓存的情况）
+   - 实现滑动窗口策略（从上次成功刷新时间计算）
+
+3. **Task 4.1: 编写过期检查单元测试** ✅
+   - 测试 None 时间戳（需要刷新）
+   - 测试旧时间戳（超过阈值，需要刷新）
+   - 测试新鲜时间戳（不需要刷新）
+   - 测试恰好处于阈值的时间戳（需要刷新）
+
+4. **Task 4.2: 编写刷新逻辑单元测试** ✅
+   - 测试批量刷新成功
+   - 测试单个股票失败时的错误处理
+   - 测试空关注列表的处理
+   - 测试调度器启动/停止生命周期
+   - 测试自定义刷新间隔和用户 ID
+
+#### 测试结果
+
+- **测试数量**: 14 个单元测试
+- **通过率**: 100% (14/14)
+- **覆盖率**: 75% (新增代码)
+- **测试文件**: `tests/test_watchlist_indicator_scheduler.py`
+
+#### 技术实现
+
+**核心类**: WatchListIndicatorScheduler
+
+```python
+# 位置: src/schedulers/watchlist_indicator_scheduler.py
+from src.schedulers.watchlist_indicator_scheduler import WatchListIndicatorScheduler
+
+# 使用示例
+scheduler = WatchListIndicatorScheduler(
+    repo=WatchedStocksRepository(),
+    indicators_service=TechnicalIndicatorsService(),
+    refresh_interval_hours=8,
+    user_id='default_user'
+)
+
+await scheduler.start()  # 启动后台任务
+# ... 运行 ...
+await scheduler.stop()   # 停止后台任务
+```
+
+**关键特性**:
+- 使用 asyncio 后台任务，不阻塞 FastAPI 事件循环
+- 滑动窗口刷新间隔（从上次成功刷新时间开始计算）
+- 启动时只刷新过期指标，避免不必要的刷新
+- 单个股票失败不影响其他股票
+- 全面的错误处理和日志记录
+
+#### 下一步
+
+- Task 2.1: 将调度器集成到 FastAPI lifespan
+- Task 3.1: 添加环境变量配置
+- Task 3.2: 加载配置到调度器
+- Task 4.3: 手动集成测试
+- Task 5.1: 更新 README
+- Task 5.2: 添加代码注释
