@@ -46,9 +46,12 @@ class WatchedStockResponse(BaseModel):
     """关注股票响应"""
     stock_code: str = Field(..., description="股票代码")
     stock_name: str = Field(..., description="股票名称")
+    market: Optional[str] = Field(None, description="Market: CN, HK, US")
     current_price: float = Field(..., description="当前价格")
     change: Optional[float] = Field(None, description="涨跌额")
     change_percent: Optional[float] = Field(None, description="涨跌幅（%）")
+    day_high: Optional[float] = Field(None, description="当日最高价")
+    day_low: Optional[float] = Field(None, description="当日最低价")
     year_high: Optional[float] = Field(None, description="一年内最高价")
     year_low: Optional[float] = Field(None, description="一年内最低价")
     bollinger: BollingerBands = Field(..., description="布林线指标")

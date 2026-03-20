@@ -90,15 +90,18 @@ class TechnicalIndicatorsService:
                 kdj_d = float(latest_kdj['d']) if pd.notna(latest_kdj['d']) else 0.0
                 kdj_j = float(latest_kdj['j']) if pd.notna(latest_kdj['j']) else 0.0
 
-                # 获取当日成交量
+                # Latest bar data (today's OHLCV)
                 latest_data = df.iloc[-1]
                 volume = float(latest_data.get('volume', 0)) if pd.notna(latest_data.get('volume')) else 0.0
+                day_high = float(latest_data.get('high', 0)) if pd.notna(latest_data.get('high')) else None
+                day_low = float(latest_data.get('low', 0)) if pd.notna(latest_data.get('low')) else None
 
-                # 构建响应
                 results[code] = {
                     'price': analysis_result.current_price,
                     'change': quote.get('change') if quote else 0,
                     'change_percent': quote.get('change_percent') if quote else 0,
+                    'day_high': day_high,
+                    'day_low': day_low,
                     'bollinger': {
                         'upper': analysis_result.bollinger_upper,
                         'middle': analysis_result.bollinger_middle,
@@ -161,6 +164,8 @@ class TechnicalIndicatorsService:
             'price': 0.0,
             'change': 0.0,
             'change_percent': 0.0,
+            'day_high': None,
+            'day_low': None,
             'bollinger': {
                 'upper': 0.0,
                 'middle': 0.0,

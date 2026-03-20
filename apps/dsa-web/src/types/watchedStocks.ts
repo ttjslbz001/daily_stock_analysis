@@ -39,9 +39,12 @@ export interface KDJ {
 export interface WatchedStock {
   stock_code: string;       // 股票代码
   stock_name: string;       // 股票名称
+  market?: string;          // Market: CN, HK, US
   current_price: number;    // 当前价格
   change?: number;          // 涨跌额
   change_percent?: number;  // 涨跌幅（%）
+  day_high?: number;        // 当日最高价
+  day_low?: number;         // 当日最低价
   year_high?: number;       // 一年内最高价
   year_low?: number;        // 一年内最低价
   bollinger: BollingerBands; // 布林线指标

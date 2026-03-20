@@ -87,29 +87,28 @@ class AppLifespanSchedulerTestCase(unittest.TestCase):
             mock_stop.assert_called_once()
 
     def test_scheduler_refresh_if_needed_called_on_startup(self) -> None:
-        """Test that scheduler.refresh_if_needed() is called on startup."""
+        """Test that scheduler.refresh_if_needed() is called on startup.
+
+        Since start() fires refresh_if_needed as a background task (non-blocking),
+        we need to yield control to let the task run before asserting.
+        """
         from api.app import create_app
 
-        # Mock refresh_if_needed
         with patch.object(
             WatchListIndicatorScheduler,
             'refresh_if_needed',
             new_callable=AsyncMock
         ) as mock_refresh:
-            # Create app and trigger lifespan
             app = create_app()
-
-            # Get the lifespan context
             lifespan = app.router.lifespan_context
 
-            # Enter lifespan (startup)
             async def run_lifespan():
                 async with lifespan(app):
-                    pass
+                    # Yield control so background tasks (create_task) can execute
+                    await asyncio.sleep(0)
 
             asyncio.run(run_lifespan())
 
-            # Verify refresh_if_needed was called (called by start())
             mock_refresh.assert_called_once()
 
 

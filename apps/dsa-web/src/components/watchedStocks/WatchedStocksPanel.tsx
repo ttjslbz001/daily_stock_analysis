@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/index';
 import type { WatchedStock } from '../../types/watchedStocks';
 
@@ -34,7 +35,7 @@ const IndicatorValue: React.FC<{
   values: Array<{ value: string; color: string }>;
   separator?: string;
 }> = ({ label, values, separator = '/' }) => (
-  <div className="flex items-center gap-2 text-sm min-w-[140px]">
+  <div className="flex items-center gap-2 text-sm min-w-[140px] shrink-0">
     <span className="text-muted shrink-0 text-xs w-12">{label}</span>
     <div className="flex items-center gap-1 font-mono text-xs">
       {values.map((item, idx) => (
@@ -50,6 +51,7 @@ const IndicatorValue: React.FC<{
 );
 
 export const WatchedStocksPanel: React.FC = () => {
+  const navigate = useNavigate();
   const [stocks, setStocks] = useState<StockWithLoading[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +59,85 @@ export const WatchedStocksPanel: React.FC = () => {
   const [addingStock, setAddingStock] = useState(false);
   const [newStockCode, setNewStockCode] = useState('');
   const [deletingStock, setDeletingStock] = useState<StockWithLoading | null>(null);
+  const [analyzingCode, setAnalyzingCode] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const escapeCsv = (v: unknown): string => {
+    if (v === undefined || v === null) return '';
+    const s = String(v);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const handleExport = () => {
+    const rows = stocks.filter(s => !s.loading && !s.error);
+    if (rows.length === 0) return;
+    setExporting(true);
+    const headers = [
+      'stock_code', 'stock_name', 'market', 'current_price', 'change', 'change_percent',
+      'bollinger_upper', 'bollinger_middle', 'bollinger_lower',
+      'macd_dif', 'macd_dea', 'macd_bar',
+      'rsi6', 'rsi12', 'rsi24',
+      'kdj_k', 'kdj_d', 'kdj_j',
+      'volume', 'day_high', 'day_low', 'year_high', 'year_low', 'updated_at'
+    ];
+    const csvRows = [headers.join(',')];
+    for (const s of rows) {
+      csvRows.push([
+        escapeCsv(s.stock_code),
+        escapeCsv(s.stock_name),
+        escapeCsv(s.market),
+        escapeCsv(s.current_price),
+        escapeCsv(s.change),
+        escapeCsv(s.change_percent),
+        escapeCsv(s.bollinger?.upper),
+        escapeCsv(s.bollinger?.middle),
+        escapeCsv(s.bollinger?.lower),
+        escapeCsv(s.macd?.dif),
+        escapeCsv(s.macd?.dea),
+        escapeCsv(s.macd?.bar),
+        escapeCsv(s.rsi?.rsi6),
+        escapeCsv(s.rsi?.rsi12),
+        escapeCsv(s.rsi?.rsi24),
+        escapeCsv(s.kdj?.k),
+        escapeCsv(s.kdj?.d),
+        escapeCsv(s.kdj?.j),
+        escapeCsv(s.volume),
+        escapeCsv(s.day_high),
+        escapeCsv(s.day_low),
+        escapeCsv(s.year_high),
+        escapeCsv(s.year_low),
+        escapeCsv(s.updated_at)
+      ].join(','));
+    }
+    const csv = '\uFEFF' + csvRows.join('\n');
+    const date = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stock_indicators-${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExporting(false);
+  };
+
+  const handleAnalyze = async (stockCode: string) => {
+    setAnalyzingCode(stockCode);
+    try {
+      await apiClient.post('/api/v1/analysis/analyze', {
+        stock_code: stockCode,
+        report_type: 'detailed',
+        force_refresh: false,
+        async_mode: true,
+      }, { validateStatus: (s) => s === 200 || s === 202 || s === 409 });
+      navigate('/');
+    } catch (err) {
+      console.error(`Analyze ${stockCode} failed:`, err);
+    } finally {
+      setAnalyzingCode(null);
+    }
+  };
 
   // 获取基础列表（快速）
   const fetchStockList = async () => {
@@ -313,7 +394,7 @@ export const WatchedStocksPanel: React.FC = () => {
     return (
       <div
         key={stock.stock_code}
-        className="flex items-center gap-4 px-4 py-3 border-b border-white/5 hover:bg-white/[0.02] transition-colors group flex-wrap"
+        className="flex items-center gap-4 px-4 py-3 border-b border-white/5 hover:bg-white/[0.02] transition-colors group min-w-0"
       >
         {/* 股票代码和名称 */}
         <div className="flex items-center gap-3 min-w-[140px]">
@@ -331,6 +412,13 @@ export const WatchedStocksPanel: React.FC = () => {
               {stock.stock_name && stock.stock_name !== stock.stock_code ? stock.stock_name : ''}
             </span>
             <span className="text-xs text-muted ml-2">{stock.stock_code}</span>
+            {stock.market && (
+              <span className={`ml-1.5 text-[10px] px-1 py-0.5 rounded font-medium ${
+                stock.market === 'US' ? 'bg-blue-500/15 text-blue-400' :
+                stock.market === 'HK' ? 'bg-purple-500/15 text-purple-400' :
+                'bg-yellow-500/15 text-yellow-400'
+              }`}>{stock.market}</span>
+            )}
           </div>
         </div>
 
@@ -363,7 +451,7 @@ export const WatchedStocksPanel: React.FC = () => {
             <div className="w-20 h-4 bg-white/5 rounded animate-pulse" />
           </div>
         ) : (
-          <div className="flex items-center gap-3 flex-1 overflow-hidden sm:flex-nowrap flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
             <IndicatorValue
               label="BOLL"
               values={[
@@ -408,6 +496,14 @@ export const WatchedStocksPanel: React.FC = () => {
             />
             <div className="w-px h-6 bg-white/10" />
             <IndicatorValue
+              label="日高/低"
+              values={[
+                { value: stock.day_high?.toFixed(2) || '-', color: 'text-red-400' },
+                { value: stock.day_low?.toFixed(2) || '-', color: 'text-green-400' }
+              ]}
+            />
+            <div className="w-px h-6 bg-white/10" />
+            <IndicatorValue
               label="年高/低"
               values={[
                 { value: stock.year_high?.toFixed(2) || '-', color: 'text-red-400' },
@@ -417,35 +513,45 @@ export const WatchedStocksPanel: React.FC = () => {
           </div>
         )}
 
-        {/* 刷新按钮 */}
+        {/* Action buttons */}
         {!isLoading && (
-          <button
-            onClick={() => handleRefreshStock(stock.stock_code)}
-            disabled={stock.refreshing}
-            className="p-1 text-muted hover:text-cyan transition-colors disabled:opacity-50"
-            title="刷新指标"
-          >
-            <svg
-              className={`w-4 h-4 ${stock.refreshing ? 'animate-spin' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleAnalyze(stock.stock_code)}
+              disabled={analyzingCode === stock.stock_code}
+              className="px-2 py-1 text-[10px] font-medium bg-cyan/10 border border-cyan/20 text-cyan rounded hover:bg-cyan/20 transition-colors disabled:opacity-50 whitespace-nowrap"
+              title="AI 分析"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-          </button>
+              {analyzingCode === stock.stock_code ? '分析中...' : 'AI 分析'}
+            </button>
+            <button
+              onClick={() => handleRefreshStock(stock.stock_code)}
+              disabled={stock.refreshing}
+              className="p-1 text-muted hover:text-cyan transition-colors disabled:opacity-50"
+              title="刷新指标"
+            >
+              <svg
+                className={`w-4 h-4 ${stock.refreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </button>
+          </div>
         )}
       </div>
     );
   };
 
   return (
-    <div className="bg-card rounded-xl border border-white/5 overflow-hidden">
+    <div className="bg-card rounded-xl border border-white/5 overflow-hidden min-w-0 w-full">
       {/* 标题栏 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
         <div className="flex items-center gap-2">
@@ -461,6 +567,17 @@ export const WatchedStocksPanel: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exporting || stocks.length === 0 || stocks.some(s => s.loading)}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-white/5 border border-white/10 text-secondary hover:text-white hover:border-white/20 rounded-lg transition-colors disabled:opacity-50"
+            title="导出 CSV"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            {exporting ? '导出中...' : '导出'}
+          </button>
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -485,17 +602,18 @@ export const WatchedStocksPanel: React.FC = () => {
 
       {/* 表头 */}
       {stocks.length > 0 && (
-        <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted border-b border-white/5 bg-white/[0.01] flex-wrap">
-          <div className="min-w-[140px]">股票</div>
-          <div className="min-w-[160px]">价格 / 涨跌</div>
-          <div className="w-px h-4 bg-white/10 hidden sm:block" />
-          <div className="min-w-[140px]">布林线 (上/中/下)</div>
-          <div className="min-w-[140px]">MACD</div>
-          <div className="min-w-[140px]">RSI (6/12/24)</div>
-          <div className="min-w-[140px]">KDJ (K/D/J)</div>
-          <div className="min-w-[140px]">成交量</div>
-          <div className="min-w-[140px]">年高/低</div>
-          <div className="w-8" /> {/* 刷新按钮占位 */}
+        <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted border-b border-white/5 bg-white/[0.01] flex-wrap min-w-0">
+          <div className="min-w-[140px] shrink-0">股票</div>
+          <div className="min-w-[160px] shrink-0">价格 / 涨跌</div>
+          <div className="w-px h-4 bg-white/10 hidden sm:block shrink-0" />
+          <div className="min-w-[140px] shrink-0">布林线 (上/中/下)</div>
+          <div className="min-w-[140px] shrink-0">MACD</div>
+          <div className="min-w-[140px] shrink-0">RSI (6/12/24)</div>
+          <div className="min-w-[140px] shrink-0">KDJ (K/D/J)</div>
+          <div className="min-w-[140px] shrink-0">成交量</div>
+          <div className="min-w-[140px] shrink-0">日高/低</div>
+          <div className="min-w-[140px] shrink-0">年高/低</div>
+          <div className="w-20 shrink-0" />
         </div>
       )}
 

@@ -1,8 +1,72 @@
-# 项目笔记
+# Project Notes
+
+## 2026-03-16 Re-Initialization (Cursor Agent Scaffold)
+
+### Tech Stack Summary
+- **Language**: Python 3.10+ (local system: 3.13.3)
+- **Backend**: FastAPI + SQLAlchemy 2.0 + SQLite
+- **Frontend**: React 19 + TypeScript + Vite 7 + Tailwind CSS 4 (`apps/dsa-web/`)
+- **AI**: LiteLLM (Gemini, DeepSeek, OpenAI, Anthropic, etc.)
+- **Data providers**: AkShare, Tushare, YFinance, Efinance, Baostock, Pytdx (Strategy Pattern via `DataFetcherManager`)
+- **Testing**: pytest (backend, 31 test files, 70% coverage gate), vitest (frontend)
+- **Lint**: black + isort + flake8, line-width 120
+- **Deploy**: Docker (multi-stage), GitHub Actions (10 workflows), local dev server
+- **Notification**: 10 sender implementations (WeChat, Feishu, Telegram, DingTalk, Discord, Email, Pushover, PushPlus, ServerChan3, Astrbot)
+
+### Codebase Size (as of 2026-03-16)
+- **Python source files**: ~70+ across `src/`, `api/`, `data_provider/`, `bot/`, `patch/`, `scripts/`
+- **src/**: 16 top-level modules + `core/` (pipeline, market_review, trading_calendar) + `services/` (10) + `repositories/` (6) + `schedulers/` (1) + `agent/` (5) + `mcp/` (3) + `notification_sender/` (10)
+- **api/**: 27 files — app factory, v1 router, 9 endpoint modules, 7 schema modules, 2 middleware modules
+- **data_provider/**: 10 files — base + 6 fetchers + realtime_types + us_index_mapping + __init__
+- **tests/**: 31 test files
+- **strategies/**: 11 YAML trading strategy definitions
+- **Frontend**: React 19 SPA with Zustand state, axios HTTP, react-router-dom v7
+- **GitHub Actions**: 10 workflow files (CI, security, daily analysis, Docker publish, auto-tag, PR review, stale, network smoke, desktop release, GHCR+DockerHub)
+
+### Key Findings from Scan
+- Multi-stage Docker build (Node 20 frontend builder → Python 3.11-slim-bookworm runtime)
+- CI pipeline: backend-gate → test-coverage, web-gate (parallel, path-filtered change detection)
+- Security scanning: Bandit, Safety, Semgrep, TruffleHog, CodeQL (via security.yml)
+- MCP server integrated via FastAPI (SSE endpoint + tool handlers for stock analysis, real-time quotes, search, indices)
+- Agent system: `src/agent/` (conversation, executor, factory, tools, skills) — multi-turn strategy chat
+- Bot platform integrations: DingTalk (stream), Discord, Feishu (stream)
+- Repository pattern: `BaseRepository[T]` generic CRUD in `src/repositories/base.py`
+- Scheduler subsystem: `WatchListIndicatorScheduler` (asyncio background task, 8h default interval)
+- Core pipeline: `src/core/pipeline.py` orchestrates stock analysis, `src/core/trading_calendar.py` handles exchange holiday logic
+- CI gate script: `scripts/ci_gate.sh` — syntax check + flake8 critical + deterministic tests + offline test suite
+
+### Conventions Detected
+- Commit style: `type(scope): message` — feat, fix, docs, chore, test, refactor
+- Branch naming: `feature/description`, `fix/description`
+- Current branch: `feature/software-engineering-improvement`
+- English-only commit messages, no Co-Authored-By
+- English-only code comments (AGENTS.md rule); legacy Chinese docstrings in existing code
+- black + isort + flake8 formatting pipeline
+- Makefile-driven build/test/lint/dev orchestration (17 targets)
+- Naming: snake_case Python, camelCase TypeScript, kebab-case frontend app dir
+- Auto-tagging: `#patch`/`#minor`/`#major` in commit message triggers version tag
+
+### Potential Risks
+- `setup.cfg` [tool:pytest] section conflicts with `pytest.ini` (both define testpaths/markers differently) — pytest.ini takes precedence
+- flake8 ignores E501 in `setup.cfg` but Makefile lint target uses `--ignore=E203,W503` (no E501) — inconsistent
+- SQLAlchemy DetachedInstanceError documented in WatchedStocksRepository (manual object copying workaround)
+- East Money API rate limiting — ENABLE_EASTMONEY_PATCH available as mitigation
+- System Python is 3.13.3, but CI runs 3.11 and pyproject.toml targets 3.10-3.12
+- No database migration system — schema changes require manual DB recreation or ALTER TABLE
+- `docker-compose.yml` still uses `version: '3.8'` key (deprecated in newer Docker Compose)
+
+### Files Generated/Updated
+- `.cursor/domain/adapter.md` — verified and updated (React 19, 31 test files, added src/core/)
+- `state.json` — regenerated with accurate project state
+- `.cursor/templates/state.json` — regenerated (template copy)
+- `notes.md` — refreshed with current scan findings (this section)
+- `init.sh` — updated with improved idempotency and smoke tests
+- `.cursor/domain/knowledge/architecture.md` — verified accurate
+- `.cursor/domain/knowledge/deployment.md` — verified accurate
 
 ---
 
-## 📋 会话摘要（2026-03-15）
+## 📋 Session Summary (2026-03-15)
 
 ### 当前分支
 `feature/software-engineering-improvement`

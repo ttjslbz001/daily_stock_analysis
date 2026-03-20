@@ -1,20 +1,22 @@
 /**
- * WatchedStocks API 客户端测试
+ * WatchedStocks API client tests
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { getWatchedStocks, addWatchedStock, removeWatchedStock } from './watchedStocks'
 
-// Mock axios
-vi.mock('axios', () => ({
+const mockGet = vi.fn()
+const mockPost = vi.fn()
+const mockDelete = vi.fn()
+
+vi.mock('./index', () => ({
   default: {
-    create: () => ({
-      get: vi.fn(),
-      post: vi.fn(),
-      delete: vi.fn(),
-    }),
+    get: (...args: unknown[]) => mockGet(...args),
+    post: (...args: unknown[]) => mockPost(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
   },
 }))
+
+import { watchedStocksApi } from './watchedStocks'
 
 describe('WatchedStocks API', () => {
   beforeEach(() => {
@@ -23,41 +25,53 @@ describe('WatchedStocks API', () => {
 
   describe('getWatchedStocks', () => {
     it('should fetch watched stocks successfully', async () => {
-      const response = await getWatchedStocks()
+      const mockData = { items: [], total: 0 }
+      mockGet.mockResolvedValue({ data: mockData })
 
-      expect(response).toBeDefined()
-      // 根据实际实现调整断言
+      const response = await watchedStocksApi.getWatchedStocks()
+
+      expect(response).toEqual(mockData)
+      expect(mockGet).toHaveBeenCalledWith('/api/v1/watched')
     })
 
     it('should handle API errors', async () => {
-      // 测试错误处理
-      await expect(getWatchedStocks()).rejects.toThrow()
+      mockGet.mockRejectedValue(new Error('Network error'))
+
+      await expect(watchedStocksApi.getWatchedStocks()).rejects.toThrow('Network error')
     })
   })
 
   describe('addWatchedStock', () => {
     it('should add a stock to watch list', async () => {
       const stockCode = '600519'
+      const mockData = { success: true, stock_code: stockCode }
+      mockPost.mockResolvedValue({ data: mockData })
 
-      const result = await addWatchedStock(stockCode)
+      const result = await watchedStocksApi.addWatchedStock({ stock_code: stockCode })
 
-      expect(result).toBeDefined()
+      expect(result).toEqual(mockData)
+      expect(mockPost).toHaveBeenCalledWith('/api/v1/watched', { stock_code: stockCode })
     })
 
-    it('should validate stock code format', async () => {
-      const invalidCode = 'invalid'
+    it('should propagate API errors', async () => {
+      mockPost.mockRejectedValue(new Error('Bad request'))
 
-      await expect(addWatchedStock(invalidCode)).rejects.toThrow()
+      await expect(
+        watchedStocksApi.addWatchedStock({ stock_code: 'invalid' })
+      ).rejects.toThrow('Bad request')
     })
   })
 
   describe('removeWatchedStock', () => {
     it('should remove a stock from watch list', async () => {
       const stockCode = '600519'
+      const mockData = { success: true }
+      mockDelete.mockResolvedValue({ data: mockData })
 
-      const result = await removeWatchedStock(stockCode)
+      const result = await watchedStocksApi.removeWatchedStock(stockCode)
 
-      expect(result).toBeDefined()
+      expect(result).toEqual(mockData)
+      expect(mockDelete).toHaveBeenCalledWith(`/api/v1/watched/${stockCode}`)
     })
   })
 })

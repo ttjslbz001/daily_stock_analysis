@@ -52,9 +52,12 @@ def _build_response_from_cache(watched_stock) -> WatchedStockResponse:
     return WatchedStockResponse(
         stock_code=watched_stock.stock_code,
         stock_name=watched_stock.stock_name or watched_stock.stock_code,
+        market=getattr(watched_stock, 'market', None),
         current_price=watched_stock.cached_price or 0.0,
         change=watched_stock.cached_change,
         change_percent=watched_stock.cached_change_percent,
+        day_high=getattr(watched_stock, 'cached_day_high', None),
+        day_low=getattr(watched_stock, 'cached_day_low', None),
         year_high=watched_stock.cached_year_high,
         year_low=watched_stock.cached_year_low,
         bollinger=BollingerBands(
@@ -108,9 +111,12 @@ def get_watched_stocks():
             items.append(WatchedStockResponse(
                 stock_code=ws.stock_code,
                 stock_name=ws.stock_name or ws.stock_code,
+                market=getattr(ws, 'market', None),
                 current_price=0.0,
                 change=None,
                 change_percent=None,
+                day_high=None,
+                day_low=None,
                 year_high=None,
                 year_low=None,
                 bollinger=BollingerBands(upper=0.0, middle=0.0, lower=0.0),
@@ -185,17 +191,30 @@ def get_stock_indicators(
             'rsi': rsi_data,
             'kdj': kdj_data,
             'volume': data.get('volume'),
+            'day_high': data.get('day_high'),
+            'day_low': data.get('day_low'),
             'year_high': data.get('year_high'),
             'year_low': data.get('year_low'),
         }
         repo.update_cached_indicators(stock_code, cache_data, DEFAULT_USER_ID)
 
+        # Update stored stock_name if we got a better one from the data source
+        resolved_name = data.get('stock_name') or watched_stock.stock_name or stock_code
+        if resolved_name and resolved_name != stock_code and watched_stock.stock_name in (None, '', stock_code):
+            try:
+                repo.update_stock_name(stock_code, resolved_name, DEFAULT_USER_ID)
+            except Exception:
+                pass
+
         return WatchedStockResponse(
             stock_code=stock_code,
-            stock_name=data.get('stock_name', watched_stock.stock_name or stock_code),
+            stock_name=resolved_name,
+            market=getattr(watched_stock, 'market', None),
             current_price=data.get('price', 0.0),
             change=data.get('change'),
             change_percent=data.get('change_percent'),
+            day_high=data.get('day_high'),
+            day_low=data.get('day_low'),
             year_high=data.get('year_high'),
             year_low=data.get('year_low'),
             bollinger=BollingerBands(
@@ -242,12 +261,12 @@ def add_watched_stock(request: AddWatchedStockRequest):
     """
     添加关注股票
 
-    将指定的股票添加到用户的关注列表中
+    将指定的股票添加到用户的关注列表中。
+    如果未提供股票名称，自动从数据源解析。
     """
     try:
         repo = WatchedStocksRepository()
 
-        # 检查是否已存在
         if repo.exists(request.stock_code, DEFAULT_USER_ID):
             return AddWatchedStockResponse(
                 success=False,
@@ -255,8 +274,17 @@ def add_watched_stock(request: AddWatchedStockRequest):
                 stock_code=request.stock_code
             )
 
-        # 添加到关注列表
-        success = repo.add(request.stock_code, DEFAULT_USER_ID, request.stock_name)
+        # Auto-resolve stock name if not provided
+        stock_name = request.stock_name
+        if not stock_name:
+            try:
+                from data_provider.base import DataFetcherManager
+                manager = DataFetcherManager()
+                stock_name = manager.get_stock_name(request.stock_code) or None
+            except Exception as e:
+                logger.warning(f"Auto-resolve stock name failed for {request.stock_code}: {e}")
+
+        success = repo.add(request.stock_code, DEFAULT_USER_ID, stock_name)
         if success:
             return AddWatchedStockResponse(
                 success=True,

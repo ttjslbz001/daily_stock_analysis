@@ -32,8 +32,28 @@ from tenacity import (
 
 from src.analyzer import STOCK_NAME_MAP
 
-# 配置日志
 logger = logging.getLogger(__name__)
+
+# Fetchers known to support HK stocks (by class name).
+_HK_CAPABLE_FETCHERS = frozenset({"TushareFetcher", "AkshareFetcher", "YfinanceFetcher"})
+
+
+def detect_market(stock_code: str) -> str:
+    """
+    Detect market from stock code.
+
+    Returns:
+        'CN' for A-shares / ETFs, 'HK' for Hong Kong, 'US' for US stocks/indices.
+    """
+    from .akshare_fetcher import is_hk_stock_code
+    from .us_index_mapping import is_us_index_code, is_us_stock_code
+
+    code = normalize_stock_code(stock_code)
+    if is_us_index_code(code) or is_us_stock_code(code):
+        return "US"
+    if is_hk_stock_code(code):
+        return "HK"
+    return "CN"
 
 
 # === 标准化列名定义 ===
@@ -415,91 +435,81 @@ class DataFetcherManager:
         self._fetchers.sort(key=lambda f: f.priority)
     
     def get_daily_data(
-        self, 
+        self,
         stock_code: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         days: int = 30
     ) -> Tuple[pd.DataFrame, str]:
         """
-        获取日线数据（自动切换数据源）
-        
-        故障切换策略：
-        1. 美股指数/美股股票直接路由到 YfinanceFetcher
-        2. 其他代码从最高优先级数据源开始尝试
-        3. 捕获异常后自动切换到下一个
-        4. 记录每个数据源的失败原因
-        5. 所有数据源失败后抛出详细异常
-        
-        Args:
-            stock_code: 股票代码
-            start_date: 开始日期
-            end_date: 结束日期
-            days: 获取天数
-            
-        Returns:
-            Tuple[DataFrame, str]: (数据, 成功的数据源名称)
-            
-        Raises:
-            DataFetchError: 所有数据源都失败时抛出
+        Get daily OHLCV data with smart code-based routing.
+
+        Routing strategy:
+        - US stocks / US indices → YfinanceFetcher only
+        - HK stocks → HK-capable fetchers only (Tushare → Akshare → Yfinance)
+        - A-shares / ETFs → all fetchers in priority order
         """
         from .us_index_mapping import is_us_index_code, is_us_stock_code
+        from .akshare_fetcher import is_hk_stock_code
 
-        # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
+        errors: List[str] = []
 
-        errors = []
-
-        # 快速路径：美股指数与美股股票直接路由到 YfinanceFetcher
+        # --- US fast path: YfinanceFetcher only ---
         if is_us_index_code(stock_code) or is_us_stock_code(stock_code):
             for fetcher in self._fetchers:
                 if fetcher.name == "YfinanceFetcher":
                     try:
-                        logger.info(f"[{fetcher.name}] 美股/美股指数 {stock_code} 直接路由...")
+                        logger.info(f"[{fetcher.name}] US route for {stock_code}")
                         df = fetcher.get_daily_data(
-                            stock_code=stock_code,
-                            start_date=start_date,
-                            end_date=end_date,
-                            days=days,
+                            stock_code=stock_code, start_date=start_date,
+                            end_date=end_date, days=days,
                         )
                         if df is not None and not df.empty:
-                            logger.info(f"[{fetcher.name}] 成功获取 {stock_code}")
                             return df, fetcher.name
                     except Exception as e:
-                        error_msg = f"[{fetcher.name}] 失败: {str(e)}"
-                        logger.warning(error_msg)
-                        errors.append(error_msg)
+                        errors.append(f"[{fetcher.name}] {e}")
                     break
-            # YfinanceFetcher failed or not found
-            error_summary = f"美股/美股指数 {stock_code} 获取失败:\n" + "\n".join(errors)
-            logger.error(error_summary)
-            raise DataFetchError(error_summary)
+            raise DataFetchError(
+                f"US stock {stock_code} fetch failed:\n" + "\n".join(errors)
+            )
 
+        # --- HK fast path: only HK-capable fetchers ---
+        if is_hk_stock_code(stock_code):
+            hk_fetchers = [f for f in self._fetchers if f.name in _HK_CAPABLE_FETCHERS]
+            for fetcher in hk_fetchers:
+                try:
+                    logger.info(f"[{fetcher.name}] HK route for {stock_code}")
+                    df = fetcher.get_daily_data(
+                        stock_code=stock_code, start_date=start_date,
+                        end_date=end_date, days=days,
+                    )
+                    if df is not None and not df.empty:
+                        return df, fetcher.name
+                except Exception as e:
+                    errors.append(f"[{fetcher.name}] {e}")
+                    continue
+            raise DataFetchError(
+                f"HK stock {stock_code} fetch failed:\n" + "\n".join(errors)
+            )
+
+        # --- A-share / ETF: try all fetchers in priority order ---
         for fetcher in self._fetchers:
             try:
-                logger.info(f"尝试使用 [{fetcher.name}] 获取 {stock_code}...")
+                logger.info(f"[{fetcher.name}] trying {stock_code}...")
                 df = fetcher.get_daily_data(
-                    stock_code=stock_code,
-                    start_date=start_date,
-                    end_date=end_date,
-                    days=days
+                    stock_code=stock_code, start_date=start_date,
+                    end_date=end_date, days=days,
                 )
-                
                 if df is not None and not df.empty:
-                    logger.info(f"[{fetcher.name}] 成功获取 {stock_code}")
                     return df, fetcher.name
-                    
             except Exception as e:
-                error_msg = f"[{fetcher.name}] 失败: {str(e)}"
-                logger.warning(error_msg)
-                errors.append(error_msg)
-                # 继续尝试下一个数据源
+                errors.append(f"[{fetcher.name}] {e}")
                 continue
-        
-        # 所有数据源都失败
-        error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
-        logger.error(error_summary)
-        raise DataFetchError(error_summary)
+
+        raise DataFetchError(
+            f"All sources failed for {stock_code}:\n" + "\n".join(errors)
+        )
     
     @property
     def available_fetchers(self) -> List[str]:
@@ -631,7 +641,7 @@ class DataFetcherManager:
             logger.warning(f"[实时行情] 美股指数 {stock_code} 无可用数据源")
             return None
 
-        # 美股单独处理，使用 YfinanceFetcher
+        # US stocks → YfinanceFetcher only
         if _is_us_code(stock_code):
             for fetcher in self._fetchers:
                 if fetcher.name == "YfinanceFetcher":
@@ -639,15 +649,30 @@ class DataFetcherManager:
                         try:
                             quote = fetcher.get_realtime_quote(stock_code)
                             if quote is not None:
-                                logger.info(f"[实时行情] 美股 {stock_code} 成功获取 (来源: yfinance)")
+                                logger.info(f"[realtime] US {stock_code} OK (yfinance)")
                                 return quote
                         except Exception as e:
-                            logger.warning(f"[实时行情] 美股 {stock_code} 获取失败: {e}")
+                            logger.warning(f"[realtime] US {stock_code} failed: {e}")
                     break
-            logger.warning(f"[实时行情] 美股 {stock_code} 无可用数据源")
             return None
-        
-        # 获取配置的数据源优先级
+
+        # HK stocks → AkshareFetcher (HK EM) → TushareFetcher → YfinanceFetcher
+        from .akshare_fetcher import is_hk_stock_code
+        if is_hk_stock_code(stock_code):
+            hk_fetchers = [f for f in self._fetchers if f.name in _HK_CAPABLE_FETCHERS]
+            for fetcher in hk_fetchers:
+                if hasattr(fetcher, 'get_realtime_quote'):
+                    try:
+                        quote = fetcher.get_realtime_quote(stock_code)
+                        if quote is not None and quote.has_basic_data():
+                            logger.info(f"[realtime] HK {stock_code} OK ({fetcher.name})")
+                            return quote
+                    except Exception as e:
+                        logger.warning(f"[realtime] HK {stock_code} {fetcher.name} failed: {e}")
+            logger.warning(f"[realtime] HK {stock_code} all HK sources failed")
+            return None
+
+        # A-shares: use configured source priority
         source_priority = config.realtime_source_priority.split(',')
         
         errors = []
@@ -838,55 +863,54 @@ class DataFetcherManager:
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         """
-        获取股票中文名称（自动切换数据源）
-        
-        尝试从多个数据源获取股票名称：
-        1. 先从实时行情缓存中获取（如果有）
-        2. 依次尝试各个数据源的 get_stock_name 方法
-        3. 最后尝试让大模型通过搜索获取（需要外部调用）
-        
-        Args:
-            stock_code: 股票代码
-            
-        Returns:
-            股票中文名称，所有数据源都失败则返回 None
+        Get stock name with smart routing based on code type.
+
+        Routing: static map → cache → realtime quote → fetchers (filtered by market).
+        HK stocks only query HK-capable fetchers to avoid wasting API calls.
         """
-        # Normalize code (strip SH/SZ prefix etc.)
+        from .akshare_fetcher import is_hk_stock_code
+
         stock_code = normalize_stock_code(stock_code)
+
+        # Static map first (covers common stocks)
         if stock_code in STOCK_NAME_MAP:
             return STOCK_NAME_MAP[stock_code]
+        # Also check the bare numeric part for HK codes (e.g. HK00700 → 00700)
+        bare_code = stock_code.upper().replace('HK', '').zfill(5) if is_hk_stock_code(stock_code) else None
+        if bare_code and bare_code in STOCK_NAME_MAP:
+            return STOCK_NAME_MAP[bare_code]
 
-        # 1. 先检查缓存
-        if hasattr(self, '_stock_name_cache') and stock_code in self._stock_name_cache:
-            return self._stock_name_cache[stock_code]
-        
-        # 初始化缓存
         if not hasattr(self, '_stock_name_cache'):
             self._stock_name_cache = {}
-        
-        # 2. 尝试从实时行情中获取（最快）
+        if stock_code in self._stock_name_cache:
+            return self._stock_name_cache[stock_code]
+
+        # Try realtime quote (fast, often cached)
         quote = self.get_realtime_quote(stock_code)
         if quote and hasattr(quote, 'name') and quote.name:
-            name = quote.name
-            self._stock_name_cache[stock_code] = name
-            logger.info(f"[股票名称] 从实时行情获取: {stock_code} -> {name}")
-            return name
-        
-        # 3. 依次尝试各个数据源
-        for fetcher in self._fetchers:
+            self._stock_name_cache[stock_code] = quote.name
+            logger.info(f"[stock_name] from realtime: {stock_code} -> {quote.name}")
+            return quote.name
+
+        # Try fetchers — filter to HK-capable ones for HK codes
+        is_hk = is_hk_stock_code(stock_code)
+        candidates = self._fetchers
+        if is_hk:
+            candidates = [f for f in self._fetchers if f.name in _HK_CAPABLE_FETCHERS]
+
+        for fetcher in candidates:
             if hasattr(fetcher, 'get_stock_name'):
                 try:
                     name = fetcher.get_stock_name(stock_code)
                     if name:
                         self._stock_name_cache[stock_code] = name
-                        logger.info(f"[股票名称] 从 {fetcher.name} 获取: {stock_code} -> {name}")
+                        logger.info(f"[stock_name] from {fetcher.name}: {stock_code} -> {name}")
                         return name
                 except Exception as e:
-                    logger.debug(f"[股票名称] {fetcher.name} 获取失败: {e}")
+                    logger.debug(f"[stock_name] {fetcher.name} failed: {e}")
                     continue
-        
-        # 4. 所有数据源都失败
-        logger.warning(f"[股票名称] 所有数据源都无法获取 {stock_code} 的名称")
+
+        logger.warning(f"[stock_name] all sources failed for {stock_code}")
         return ""
 
     def batch_get_stock_names(self, stock_codes: List[str]) -> Dict[str, str]:

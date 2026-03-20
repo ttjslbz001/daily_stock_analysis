@@ -605,36 +605,36 @@ class AkshareFetcher(BaseFetcher):
     def _fetch_hk_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
         获取港股历史数据
-        
-        数据来源：ak.stock_hk_hist()
-        
+
+        优先使用 ak.stock_hk_hist()（东方财富），失败时回退到 ak.stock_hk_daily()（新浪）。
+
         Args:
-            stock_code: 港股代码，如 '00700', '01810'
+            stock_code: 港股代码，如 '00700', '01810' 或 'HK00700'
             start_date: 开始日期，格式 'YYYY-MM-DD'
             end_date: 结束日期，格式 'YYYY-MM-DD'
-            
+
         Returns:
             港股历史数据 DataFrame
         """
         import akshare as ak
-        
+
         # 防封禁策略 1: 随机 User-Agent
         self._set_random_user_agent()
-        
+
         # 防封禁策略 2: 强制休眠
         self._enforce_rate_limit()
-        
+
         # 确保代码格式正确（5位数字）
-        code = stock_code.lower().replace('hk', '').zfill(5)
-        
-        logger.info(f"[API调用] ak.stock_hk_hist(symbol={code}, period=daily, "
-                   f"start_date={start_date.replace('-', '')}, end_date={end_date.replace('-', '')}, adjust=qfq)")
-        
+        code = stock_code.lower().replace('hk', '').strip().zfill(5)
+
+        # --- 方案 1: stock_hk_hist（东方财富）---
         try:
             import time as _time
             api_start = _time.time()
-            
-            # 调用 akshare 获取港股日线数据
+
+            logger.info(f"[API调用] ak.stock_hk_hist(symbol={code}, period=daily, "
+                       f"start_date={start_date.replace('-', '')}, end_date={end_date.replace('-', '')}, adjust=qfq)")
+
             df = ak.stock_hk_hist(
                 symbol=code,
                 period="daily",
@@ -642,42 +642,72 @@ class AkshareFetcher(BaseFetcher):
                 end_date=end_date.replace('-', ''),
                 adjust="qfq"  # 前复权
             )
-            
+
             api_elapsed = _time.time() - api_start
-            
-            # 记录返回数据摘要
+
             if df is not None and not df.empty:
                 logger.info(f"[API返回] ak.stock_hk_hist 成功: 返回 {len(df)} 行数据, 耗时 {api_elapsed:.2f}s")
-                logger.info(f"[API返回] 列名: {list(df.columns)}")
-                logger.info(f"[API返回] 日期范围: {df['日期'].iloc[0]} ~ {df['日期'].iloc[-1]}")
-                logger.debug(f"[API返回] 最新3条数据:\n{df.tail(3).to_string()}")
+                date_col = '日期' if '日期' in df.columns else 'date'
+                logger.info(f"[API返回] 日期范围: {df[date_col].iloc[0]} ~ {df[date_col].iloc[-1]}")
+                return df
             else:
                 logger.warning(f"[API返回] ak.stock_hk_hist 返回空数据, 耗时 {api_elapsed:.2f}s")
-            
-            return df
-            
+
         except Exception as e:
             error_msg = str(e).lower()
-            
-            # 检测反爬封禁
             if any(keyword in error_msg for keyword in ['banned', 'blocked', '频率', 'rate', '限制']):
                 logger.warning(f"检测到可能被封禁: {e}")
                 raise RateLimitError(f"Akshare 可能被限流: {e}") from e
-            
-            raise DataFetchError(f"Akshare 获取港股数据失败: {e}") from e
+            logger.warning(f"ak.stock_hk_hist 失败，尝试 stock_hk_daily: {e}")
+
+        # --- 方案 2: stock_hk_daily（新浪）作为兜底 ---
+        self._enforce_rate_limit()
+        try:
+            import time as _time
+            api_start = _time.time()
+
+            logger.info(f"[API调用] ak.stock_hk_daily(symbol={code}, adjust=qfq) [fallback]")
+
+            df = ak.stock_hk_daily(symbol=code, adjust="qfq")
+
+            api_elapsed = _time.time() - api_start
+
+            if df is not None and not df.empty:
+                # stock_hk_daily 返回 date, open, high, low, close, volume（英文列名）
+                df = df.copy()
+                df['date'] = pd.to_datetime(df['date'])
+                df = df[(df['date'] >= start_date) & (df['date'] <= end_date)].copy()
+                if df.empty:
+                    logger.warning(f"[API返回] stock_hk_daily 在 {start_date}~{end_date} 范围内无数据")
+                    raise DataFetchError(f"港股 {code} 在指定日期范围内无数据")
+                df['amount'] = df['volume'] * df['close']
+                df['pct_chg'] = df['close'].pct_change() * 100
+                df['pct_chg'] = df['pct_chg'].fillna(0)
+                logger.info(f"[API返回] ak.stock_hk_daily 成功: 返回 {len(df)} 行数据, 耗时 {api_elapsed:.2f}s")
+                return df
+            else:
+                logger.warning(f"[API返回] ak.stock_hk_daily 返回空数据, 耗时 {api_elapsed:.2f}s")
+
+        except DataFetchError:
+            raise
+        except RateLimitError:
+            raise
+        except Exception as e:
+            logger.warning(f"ak.stock_hk_daily 也失败: {e}")
+
+        raise DataFetchError(f"Akshare 获取港股数据失败: stock_hk_hist 与 stock_hk_daily 均不可用")
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
         """
         标准化 Akshare 数据
-        
-        Akshare 返回的列名（中文）：
-        日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
-        
-        需要映射到标准列名：
-        date, open, high, low, close, volume, amount, pct_chg
+
+        stock_hk_hist 返回中文列名：日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 涨跌幅
+        stock_hk_daily 返回英文列名：date, open, high, low, close, volume（已含 amount, pct_chg）
+
+        统一映射到：date, open, high, low, close, volume, amount, pct_chg
         """
         df = df.copy()
-        
+
         # 列名映射（Akshare 中文列名 -> 标准英文列名）
         column_mapping = {
             '日期': 'date',
@@ -689,18 +719,22 @@ class AkshareFetcher(BaseFetcher):
             '成交额': 'amount',
             '涨跌幅': 'pct_chg',
         }
-        
-        # 重命名列
+
         df = df.rename(columns=column_mapping)
-        
-        # 添加股票代码列
+
+        # stock_hk_daily 可能缺少 amount/pct_chg，补全
+        if 'amount' not in df.columns and 'volume' in df.columns and 'close' in df.columns:
+            df['amount'] = df['volume'] * df['close']
+        if 'pct_chg' not in df.columns and 'close' in df.columns:
+            df['pct_chg'] = df['close'].pct_change() * 100
+            df['pct_chg'] = df['pct_chg'].fillna(0)
+
         df['code'] = stock_code
-        
-        # 只保留需要的列
+
         keep_cols = ['code'] + STANDARD_COLUMNS
         existing_cols = [col for col in keep_cols if col in df.columns]
         df = df[existing_cols]
-        
+
         return df
     
     def get_realtime_quote(self, stock_code: str, source: str = "em") -> Optional[UnifiedRealtimeQuote]:

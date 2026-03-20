@@ -55,54 +55,58 @@ class WatchListIndicatorScheduler:
         )
         self.user_id = user_id
 
-        # Background task reference
+        self._initial_task: Optional[asyncio.Task] = None
         self._refresh_task: Optional[asyncio.Task] = None
         self._running = False
 
     async def start(self) -> None:
         """
-        Start the background refresh loop
+        Start the background refresh loop (non-blocking).
 
-        This will:
-        1. Check if any stocks need immediate refresh (if stale)
-        2. Start the periodic refresh loop
+        Both the initial staleness check and the periodic loop run as
+        background tasks so that the FastAPI lifespan returns immediately
+        and the frontend can bootstrap without waiting for data refresh.
         """
         if self._running:
             logger.warning("Scheduler is already running")
             return
 
-        logger.info("Starting WatchListIndicatorScheduler")
-
-        # Initial check - refresh if any indicators are stale on startup
-        # This ensures that indicators are fresh when the server starts
-        await self.refresh_if_needed()
-
-        # Start the periodic refresh loop in the background
-        # This runs asynchronously and doesn't block the main application
+        logger.info("Starting WatchListIndicatorScheduler (non-blocking)")
         self._running = True
+
+        # Fire-and-forget: initial refresh runs in the background so the app
+        # can start serving requests immediately.
+        self._initial_task = asyncio.create_task(self._safe_initial_refresh())
+
+        # Periodic loop also runs in the background
         self._refresh_task = asyncio.create_task(self._run_refresh_loop())
         logger.info(
-            f"Started background refresh loop (interval: {self.refresh_interval_hours} hours)"
+            f"Background refresh scheduled (interval: {self.refresh_interval_hours} hours)"
         )
 
-    async def stop(self) -> None:
-        """
-        Stop the background refresh loop
+    async def _safe_initial_refresh(self) -> None:
+        """Run initial refresh with error handling so the task never crashes silently."""
+        try:
+            await self.refresh_if_needed()
+        except Exception as e:
+            logger.error(f"Initial indicator refresh failed: {e}", exc_info=True)
 
-        Cancels the running background task gracefully.
-        """
+    async def stop(self) -> None:
+        """Stop the background refresh loop and initial task gracefully."""
         if not self._running:
             return
 
         logger.info("Stopping WatchListIndicatorScheduler")
         self._running = False
 
-        if self._refresh_task and not self._refresh_task.done():
-            self._refresh_task.cancel()
-            try:
-                await self._refresh_task
-            except asyncio.CancelledError:
-                logger.debug("Refresh task cancelled successfully")
+        for task_attr in ('_initial_task', '_refresh_task'):
+            task = getattr(self, task_attr, None)
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    logger.debug(f"{task_attr} cancelled")
 
         logger.info("WatchListIndicatorScheduler stopped")
 
@@ -167,9 +171,11 @@ class WatchListIndicatorScheduler:
             stock_codes = [stock.stock_code for stock in watched_stocks]
             logger.info(f"Refreshing indicators for {len(stock_codes)} stocks: {stock_codes}")
 
-            # Batch fetch indicators from the data source
-            # This is more efficient than fetching each stock individually
-            indicators_data = self.indicators_service.get_indicators(stock_codes)
+            # Batch fetch indicators in a thread so the event loop stays free;
+            # get_indicators() is synchronous and can take many minutes for many stocks.
+            indicators_data = await asyncio.to_thread(
+                self.indicators_service.get_indicators, stock_codes
+            )
 
             # Update each stock's cached indicators in the database
             # Individual failures are logged but don't stop the batch operation

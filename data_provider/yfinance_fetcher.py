@@ -442,15 +442,93 @@ class YfinanceFetcher(BaseFetcher):
             logger.warning(f"[Yfinance] 获取美股指数 {user_code} 实时行情失败: {e}")
             return None
 
+    def _get_hk_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
+        """
+        获取港股实时行情（Akshare 东财失败时的兜底）
+
+        数据来源：yfinance，格式 0700.HK
+        """
+        import yfinance as yf
+
+        try:
+            # HK00700 -> 0700.HK, 00700 -> 0700.HK
+            code = stock_code.upper().replace('HK', '').strip().lstrip('0') or '0'
+            symbol = f"{code.zfill(4)}.HK"
+            logger.debug(f"[Yfinance] 获取港股 {stock_code} ({symbol}) 实时行情")
+            ticker = yf.Ticker(symbol)
+
+            try:
+                info = ticker.fast_info
+                if info is None:
+                    raise ValueError("fast_info is None")
+                price = getattr(info, 'lastPrice', None) or getattr(info, 'last_price', None)
+                prev_close = getattr(info, 'previousClose', None) or getattr(info, 'previous_close', None)
+                open_price = getattr(info, 'open', None)
+                high = getattr(info, 'dayHigh', None) or getattr(info, 'day_high', None)
+                low = getattr(info, 'dayLow', None) or getattr(info, 'day_low', None)
+                volume = getattr(info, 'lastVolume', None) or getattr(info, 'last_volume', None)
+            except Exception:
+                hist = ticker.history(period='2d')
+                if hist.empty:
+                    logger.warning(f"[Yfinance] 无法获取港股 {symbol} 的数据")
+                    return None
+                today = hist.iloc[-1]
+                prev = hist.iloc[-2] if len(hist) > 1 else today
+                price = float(today['Close'])
+                prev_close = float(prev['Close'])
+                open_price = float(today['Open'])
+                high = float(today['High'])
+                low = float(today['Low'])
+                volume = int(today['Volume'])
+
+            change_amount = None
+            change_pct = None
+            if price is not None and prev_close is not None and prev_close > 0:
+                change_amount = price - prev_close
+                change_pct = (change_amount / prev_close) * 100
+
+            name = stock_code
+            try:
+                name = ticker.info.get('shortName', '') or ticker.info.get('longName', '') or stock_code
+            except Exception:
+                pass
+
+            quote = UnifiedRealtimeQuote(
+                code=stock_code,
+                name=name,
+                source=RealtimeSource.FALLBACK,
+                price=price,
+                change_pct=round(change_pct, 2) if change_pct is not None else None,
+                change_amount=round(change_amount, 4) if change_amount is not None else None,
+                volume=volume,
+                amount=None,
+                volume_ratio=None,
+                turnover_rate=None,
+                amplitude=None,
+                open_price=open_price,
+                high=high,
+                low=low,
+                pre_close=prev_close,
+                pe_ratio=None,
+                pb_ratio=None,
+                total_mv=None,
+                circ_mv=None,
+            )
+            logger.info(f"[Yfinance] 获取港股 {stock_code} 实时行情成功: 价格={price}, 涨跌={change_pct}%")
+            return quote
+        except Exception as e:
+            logger.warning(f"[Yfinance] 获取港股 {stock_code} 实时行情失败: {e}")
+            return None
+
     def get_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
         """
-        获取美股/美股指数实时行情数据
+        获取美股/港股/美股指数实时行情数据
 
-        支持美股股票（AAPL、TSLA）和美股指数（SPX、DJI 等）。
-        数据来源：yfinance Ticker.info
+        支持：美股股票（AAPL）、美股指数（SPX、DJI）、港股（HK00700、00700）。
+        数据来源：yfinance Ticker.info / history
 
         Args:
-            stock_code: 美股代码或指数代码，如 'AMD', 'AAPL', 'SPX', 'DJI'
+            stock_code: 股票代码，如 'AAPL', 'SPX', 'HK00700', '00700'
 
         Returns:
             UnifiedRealtimeQuote 对象，获取失败返回 None
@@ -465,6 +543,11 @@ class YfinanceFetcher(BaseFetcher):
                 yf_symbol=yf_symbol,
                 index_name=index_name,
             )
+
+        # 港股：使用 .HK 后缀，作为 Akshare 失败时的兜底
+        from .akshare_fetcher import is_hk_stock_code
+        if is_hk_stock_code(stock_code):
+            return self._get_hk_realtime_quote(stock_code)
 
         # 仅处理美股股票
         if not self._is_us_stock(stock_code):

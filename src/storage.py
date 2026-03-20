@@ -466,6 +466,7 @@ class WatchedStock(Base):
     # 股票信息
     stock_code = Column(String(20), nullable=False)  # 股票代码（如 600519）
     stock_name = Column(String(100))  # 股票名称
+    market = Column(String(10))  # Market identifier: CN, HK, US
 
     # 缓存的价格数据
     cached_price = Column(Float)  # 当前价格
@@ -562,13 +563,16 @@ class DatabaseManager:
             bind=self._engine,
             autocommit=False,
             autoflush=False,
+            expire_on_commit=False,
         )
         
         # 创建所有表
         Base.metadata.create_all(self._engine)
 
-        # 执行 schema 迁移（添加新列）
+        # Execute schema migration (add new columns)
         self._migrate_watched_stocks_cache()
+        # Backfill market column for existing watched stocks
+        self._backfill_watched_stocks_market()
 
         self._initialized = True
         logger.info(f"数据库初始化完成: {db_url}")
@@ -598,6 +602,7 @@ class DatabaseManager:
             "cached_year_high REAL",
             "cached_year_low REAL",
             "indicators_cached_at DATETIME",
+            "market VARCHAR(10)",
         ]
 
         with self._engine.connect() as conn:
@@ -613,6 +618,27 @@ class DatabaseManager:
                     else:
                         logger.warning(f"添加列 {col_name} 时出错: {e}")
             conn.commit()
+
+    def _backfill_watched_stocks_market(self):
+        """Backfill the 'market' column for existing watched stocks that have NULL."""
+        try:
+            from data_provider.base import detect_market
+            with self._engine.connect() as conn:
+                rows = conn.execute(
+                    text("SELECT id, stock_code FROM watched_stocks WHERE market IS NULL")
+                ).fetchall()
+                if not rows:
+                    return
+                for row in rows:
+                    market = detect_market(row[1])
+                    conn.execute(
+                        text("UPDATE watched_stocks SET market = :m WHERE id = :id"),
+                        {"m": market, "id": row[0]}
+                    )
+                conn.commit()
+                logger.info(f"Backfilled market for {len(rows)} watched stocks")
+        except Exception as e:
+            logger.warning(f"Backfill market failed (non-fatal): {e}")
 
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':
