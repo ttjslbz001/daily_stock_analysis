@@ -438,6 +438,94 @@ class WatchedStock(Base):
         return f"<WatchedStock(user_id={self.user_id}, stock_code={self.stock_code}, stock_name={self.stock_name})>"
 
 
+class StockGroup(Base):
+    """
+    股票分组模型
+
+    允许用户创建自定义分组（如"科技成长"、"价值投资"）
+    使用 JSON 数组存储多个股票代码
+    """
+    __tablename__ = 'stock_groups'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # 分组名称（唯一，必填）
+    name = Column(String(100), nullable=False, unique=True, index=True)
+
+    # 分组描述（可选）
+    description = Column(Text, nullable=True)
+
+    # 股票代码列表（JSON 数组）
+    stock_codes = Column(Text, nullable=False, default='[]')
+
+    # 排序顺序（用于 UI 展示，数字越小越靠前）
+    sort_order = Column(Integer, nullable=False, default=0, index=True)
+
+    # 时间戳
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 索引
+    __table_args__ = (
+        Index('idx_stock_groups_sort_order', 'sort_order'),
+    )
+
+    def get_stock_codes(self) -> List[str]:
+        """获取股票代码列表（从 JSON 解析）"""
+        try:
+            return json.loads(self.stock_codes) if self.stock_codes else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_stock_codes(self, codes: List[str]) -> None:
+        """设置股票代码列表（转为 JSON）"""
+        self.stock_codes = json.dumps(codes, ensure_ascii=False)
+
+
+class StockWatchlist(Base):
+    """
+    股票自选列表模型
+
+    存储用户关注的股票代码
+    """
+    __tablename__ = 'stock_watchlist'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stock_code = Column(String(20), unique=True, nullable=False, index=True)
+    added_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    def __repr__(self):
+        return f"<StockWatchlist(id={self.id}, stock_code='{self.stock_code}')>"
+
+
+class StockTag(Base):
+    """
+    股票标签模型
+
+    允许用户为股票添加自由标签（如"关注"、"突破"等）
+    """
+    __tablename__ = 'stock_tags'
+
+    # 主键
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # 股票代码
+    stock_code = Column(String(10), nullable=False)
+
+    # 标签名称
+    tag_name = Column(String(50), nullable=False)
+
+    # 时间戳
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    # 索引和约束
+    __table_args__ = (
+        UniqueConstraint('stock_code', 'tag_name', name='uq_stock_tag'),
+        Index('idx_stock_tags_code', 'stock_code'),
+        Index('idx_stock_tags_name', 'tag_name'),
+    )
+
+
 class DatabaseManager:
     """
     数据库管理器 - 单例模式
