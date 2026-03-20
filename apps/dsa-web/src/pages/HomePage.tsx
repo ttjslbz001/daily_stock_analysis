@@ -293,13 +293,13 @@ const HomePage: React.FC = () => {
   return (
     <div
       className="min-h-screen flex flex-col md:grid overflow-hidden w-full"
-      style={{ gridTemplateColumns: 'minmax(12px, 1fr) 256px 24px minmax(auto, 896px) minmax(12px, 1fr)', gridTemplateRows: 'auto auto 1fr' }}
+      style={{ gridTemplateColumns: 'minmax(12px, 1fr) 256px 24px minmax(auto, 1280px) minmax(12px, 1fr)', gridTemplateRows: 'auto auto 1fr' }}
     >
       {/* 顶部输入栏 */}
       <header
         className="md:col-start-2 md:col-end-5 md:row-start-1 py-3 px-3 md:px-0 border-b border-white/5 flex-shrink-0 flex items-center min-w-0 overflow-hidden"
       >
-        <div className="flex items-center gap-2 w-full min-w-0 flex-1" style={{ maxWidth: 'min(100%, 1168px)' }}>
+        <div className="flex items-center gap-2 w-full min-w-0 flex-1" style={{ maxWidth: 'min(100%, 1280px)' }}>
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -351,8 +351,8 @@ const HomePage: React.FC = () => {
         </div>
       </header>
 
-      {/* 关注股票面板 - 宽行 */}
-      <div className="col-start-2 md:col-end-5 row-start-2 px-3 md:px-0 py-3">
+      {/* 关注股票面板 - 宽行，占满内容区宽度 */}
+      <div className="col-start-2 md:col-end-5 row-start-2 px-3 md:px-0 py-3 min-w-0 w-full">
         <WatchedStocksPanel />
       </div>
 

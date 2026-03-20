@@ -26,20 +26,32 @@ export interface RSI {
   rsi24: number;  // RSI(24) 长期
 }
 
+/** KDJ 指标 */
+export interface KDJ {
+  k: number;  // K 值
+  d: number;  // D 值
+  j: number;  // J 值
+}
+
 // ============ 响应类型 ============
 
 /** 关注股票响应 */
 export interface WatchedStock {
   stock_code: string;       // 股票代码
   stock_name: string;       // 股票名称
+  market?: string;          // Market: CN, HK, US
   current_price: number;    // 当前价格
   change?: number;          // 涨跌额
   change_percent?: number;  // 涨跌幅（%）
+  day_high?: number;        // 当日最高价
+  day_low?: number;         // 当日最低价
   year_high?: number;       // 一年内最高价
   year_low?: number;        // 一年内最低价
   bollinger: BollingerBands; // 布林线指标
   macd: MACD;              // MACD 指标
   rsi: RSI;                // RSI 指标
+  kdj: KDJ;                // KDJ 指标
+  volume: number;          // 当日成交量
   updated_at: string;      // 更新时间
 }
 

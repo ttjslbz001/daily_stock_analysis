@@ -25,9 +25,32 @@ interface SectorsBoardData {
   bottom_sectors: SectorData[];
 }
 
+interface TrackedSector {
+  name: string;
+  code: string;
+  current: number | null;
+  change_1w: number | null;
+  change_1m: number | null;
+  change_6m: number | null;
+}
+
+interface TrackedSectorsData {
+  update_time: string;
+  sectors: TrackedSector[];
+}
+
+const ChangeCell: React.FC<{ value: number | null }> = ({ value }) => {
+  if (value === null || value === undefined) return <span className="text-muted">-</span>;
+  const color = value >= 0 ? 'text-red-400' : 'text-green-400';
+  const sign = value >= 0 ? '+' : '';
+  return <span className={`font-medium ${color}`}>{sign}{value.toFixed(2)}%</span>;
+};
+
 const SectorsBoardPage: React.FC = () => {
   const [data, setData] = useState<SectorsBoardData | null>(null);
+  const [trackedData, setTrackedData] = useState<TrackedSectorsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [trackedLoading, setTrackedLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -49,13 +72,33 @@ const SectorsBoardPage: React.FC = () => {
     }
   };
 
+  const fetchTrackedSectors = async (forceRefresh = false) => {
+    try {
+      const url = forceRefresh
+        ? '/api/v1/sectors/tracked?force_refresh=true'
+        : '/api/v1/sectors/tracked';
+      const response = await fetch(url);
+      if (response.ok) {
+        const result = await response.json();
+        setTrackedData(result);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tracked sectors:', err);
+    } finally {
+      setTrackedLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
+    fetchTrackedSectors();
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
     fetchData(true);
+    setTrackedLoading(true);
+    fetchTrackedSectors(true);
   };
 
   if (loading) {
@@ -139,6 +182,49 @@ const SectorsBoardPage: React.FC = () => {
           <div className="text-xs text-muted mb-1">成交额(亿)</div>
           <div className="text-lg font-bold text-cyan">{market_overview.total_amount.toFixed(0)}</div>
         </div>
+      </div>
+
+      {/* 关注板块 */}
+      <div className="bg-card rounded-xl border border-white/5 overflow-hidden mb-6">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+          <svg className="w-4 h-4 text-cyan" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span className="text-sm font-medium text-white">关注板块</span>
+          {trackedData && (
+            <span className="text-xs text-muted ml-1">{trackedData.update_time}</span>
+          )}
+        </div>
+        {trackedLoading ? (
+          <div className="p-6 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 border-cyan/20 border-t-cyan rounded-full animate-spin" />
+          </div>
+        ) : trackedData && trackedData.sectors.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted border-b border-white/5 bg-white/[0.01]">
+                  <th className="text-left px-4 py-2 font-normal">板块</th>
+                  <th className="text-right px-4 py-2 font-normal">1周</th>
+                  <th className="text-right px-4 py-2 font-normal">1月</th>
+                  <th className="text-right px-4 py-2 font-normal">6月</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {trackedData.sectors.map((sector) => (
+                  <tr key={sector.code} className="hover:bg-white/[0.02]">
+                    <td className="px-4 py-2.5 text-white font-medium">{sector.name}</td>
+                    <td className="px-4 py-2.5 text-right"><ChangeCell value={sector.change_1w} /></td>
+                    <td className="px-4 py-2.5 text-right"><ChangeCell value={sector.change_1m} /></td>
+                    <td className="px-4 py-2.5 text-right"><ChangeCell value={sector.change_6m} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-4 text-center text-sm text-muted">暂无数据</div>
+        )}
       </div>
 
       {/* 涨跌榜 */}

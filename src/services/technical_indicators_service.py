@@ -70,11 +70,38 @@ class TechnicalIndicatorsService:
                 year_high = float(df['high'].max()) if len(df) > 0 else 0.0
                 year_low = float(df['low'].min()) if len(df) > 0 else 0.0
 
-                # 构建响应
+                # 计算 KDJ 指标
+                # KDJ 使用 9 日 RSV (未成熟随机值)
+                # RSV = (收盘价 - 9日最低价) / (9日最高价 - 9日最低价) * 100
+                df['low_9'] = df['low'].rolling(window=9).min()
+                df['high_9'] = df['high'].rolling(window=9).max()
+                df['rsv'] = ((df['close'] - df['low_9']) / (df['high_9'] - df['low_9']) * 100).fillna(50)
+
+                # K 值 = (2/3) * 前一日 K + (1/3) * 当日 RSV
+                # D 值 = (2/3) * 前一日 D + (1/3) * 当日 K
+                # J 值 = 3 * 当日 K - 2 * 当日 D
+                df['k'] = df['rsv'].ewm(alpha=1/3, adjust=False).mean()
+                df['d'] = df['k'].ewm(alpha=1/3, adjust=False).mean()
+                df['j'] = 3 * df['k'] - 2 * df['d']
+
+                # 获取最新的 KDJ 值
+                latest_kdj = df.iloc[-1]
+                kdj_k = float(latest_kdj['k']) if pd.notna(latest_kdj['k']) else 0.0
+                kdj_d = float(latest_kdj['d']) if pd.notna(latest_kdj['d']) else 0.0
+                kdj_j = float(latest_kdj['j']) if pd.notna(latest_kdj['j']) else 0.0
+
+                # Latest bar data (today's OHLCV)
+                latest_data = df.iloc[-1]
+                volume = float(latest_data.get('volume', 0)) if pd.notna(latest_data.get('volume')) else 0.0
+                day_high = float(latest_data.get('high', 0)) if pd.notna(latest_data.get('high')) else None
+                day_low = float(latest_data.get('low', 0)) if pd.notna(latest_data.get('low')) else None
+
                 results[code] = {
                     'price': analysis_result.current_price,
                     'change': quote.get('change') if quote else 0,
                     'change_percent': quote.get('change_percent') if quote else 0,
+                    'day_high': day_high,
+                    'day_low': day_low,
                     'bollinger': {
                         'upper': analysis_result.bollinger_upper,
                         'middle': analysis_result.bollinger_middle,
@@ -90,6 +117,12 @@ class TechnicalIndicatorsService:
                         'rsi12': analysis_result.rsi_12,
                         'rsi24': analysis_result.rsi_24
                     },
+                    'kdj': {
+                        'k': kdj_k,
+                        'd': kdj_d,
+                        'j': kdj_j
+                    },
+                    'volume': volume,
                     'year_high': year_high,
                     'year_low': year_low,
                     'stock_name': quote.get('stock_name') if quote else code
@@ -131,6 +164,8 @@ class TechnicalIndicatorsService:
             'price': 0.0,
             'change': 0.0,
             'change_percent': 0.0,
+            'day_high': None,
+            'day_low': None,
             'bollinger': {
                 'upper': 0.0,
                 'middle': 0.0,
@@ -146,6 +181,12 @@ class TechnicalIndicatorsService:
                 'rsi12': 0.0,
                 'rsi24': 0.0
             },
+            'kdj': {
+                'k': 0.0,
+                'd': 0.0,
+                'j': 0.0
+            },
+            'volume': 0.0,
             'stock_name': stock_code,
             'year_high': 0.0,
             'year_low': 0.0

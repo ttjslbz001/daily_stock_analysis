@@ -35,18 +35,30 @@ class RSI(BaseModel):
     rsi24: float = Field(..., description="RSI(24) 长期")
 
 
+class KDJ(BaseModel):
+    """KDJ 指标"""
+    k: float = Field(..., description="K 值")
+    d: float = Field(..., description="D 值")
+    j: float = Field(..., description="J 值")
+
+
 class WatchedStockResponse(BaseModel):
     """关注股票响应"""
     stock_code: str = Field(..., description="股票代码")
     stock_name: str = Field(..., description="股票名称")
+    market: Optional[str] = Field(None, description="Market: CN, HK, US")
     current_price: float = Field(..., description="当前价格")
     change: Optional[float] = Field(None, description="涨跌额")
     change_percent: Optional[float] = Field(None, description="涨跌幅（%）")
+    day_high: Optional[float] = Field(None, description="当日最高价")
+    day_low: Optional[float] = Field(None, description="当日最低价")
     year_high: Optional[float] = Field(None, description="一年内最高价")
     year_low: Optional[float] = Field(None, description="一年内最低价")
     bollinger: BollingerBands = Field(..., description="布林线指标")
     macd: MACD = Field(..., description="MACD 指标")
     rsi: RSI = Field(..., description="RSI 指标")
+    kdj: KDJ = Field(..., description="KDJ 指标")
+    volume: float = Field(..., description="当日成交量")
     updated_at: datetime = Field(..., description="更新时间")
 
 

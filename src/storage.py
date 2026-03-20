@@ -54,6 +54,76 @@ logger = logging.getLogger(__name__)
 # SQLAlchemy ORM 基类
 Base = declarative_base()
 
+
+class SessionContext:
+    """
+    数据库会话上下文管理器
+
+    提供安全的事务管理，确保会话正确关闭并避免连接泄漏。
+
+    特性:
+    - 自动提交/回滚事务
+    - 自动关闭会话，防止连接泄漏
+    - 支持自动提交模式和手动提交模式
+    - 详细的错误日志记录
+    """
+
+    def __init__(self, session: Session, auto_commit: bool = True):
+        """
+        初始化会话上下文
+
+        Args:
+            session: SQLAlchemy 会话对象
+            auto_commit: 是否自动提交事务（默认 True）
+        """
+        self._session = session
+        self._auto_commit = auto_commit
+        self._is_closed = False
+
+    def __enter__(self) -> Session:
+        """进入上下文，返回会话对象"""
+        return self._session
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """退出上下文，处理事务提交/回滚和会话关闭"""
+        if self._is_closed:
+            return
+
+        try:
+            if exc_type is None and self._auto_commit:
+                # 无异常且自动提交模式 -> 提交事务
+                self._session.commit()
+                logger.debug("数据库事务已自动提交")
+            elif exc_type is not None:
+                # 发生异常 -> 回滚事务
+                self._session.rollback()
+                logger.debug(
+                    f"数据库事务已回滚: {exc_type.__name__}: {exc_val}"
+                )
+                # 不抑制异常，让它继续传播
+            else:
+                # 无异常且手动提交模式 -> 不自动提交
+                logger.debug("数据库会话关闭（手动提交模式）")
+        except Exception as e:
+            # 处理过程中的异常 -> 记录日志并回滚
+            logger.error(
+                f"处理数据库事务时发生错误: {e}，尝试回滚"
+            )
+            try:
+                self._session.rollback()
+            except Exception as rollback_error:
+                logger.error(f"回滚事务时也发生错误: {rollback_error}")
+            # 如果原异常存在，优先传播原异常；否则传播新异常
+            if exc_type is None:
+                raise
+        finally:
+            # 无论成功与否，都要关闭会话
+            try:
+                self._session.close()
+                self._is_closed = True
+            except Exception as e:
+                logger.error(f"关闭数据库会话时发生错误: {e}")
+
 if TYPE_CHECKING:
     from src.search_service import SearchResponse
 
@@ -396,6 +466,7 @@ class WatchedStock(Base):
     # 股票信息
     stock_code = Column(String(20), nullable=False)  # 股票代码（如 600519）
     stock_name = Column(String(100))  # 股票名称
+    market = Column(String(10))  # Market identifier: CN, HK, US
 
     # 缓存的价格数据
     cached_price = Column(Float)  # 当前价格
@@ -416,6 +487,14 @@ class WatchedStock(Base):
     cached_rsi6 = Column(Float)
     cached_rsi12 = Column(Float)
     cached_rsi24 = Column(Float)
+
+    # 缓存的 KDJ 指标
+    cached_kdj_k = Column(Float)
+    cached_kdj_d = Column(Float)
+    cached_kdj_j = Column(Float)
+
+    # 缓存的成交量
+    cached_volume = Column(Float)
 
     # 缓存的一年最高/最低价
     cached_year_high = Column(Float)
@@ -572,13 +651,16 @@ class DatabaseManager:
             bind=self._engine,
             autocommit=False,
             autoflush=False,
+            expire_on_commit=False,
         )
         
         # 创建所有表
         Base.metadata.create_all(self._engine)
 
-        # 执行 schema 迁移（添加新列）
+        # Execute schema migration (add new columns)
         self._migrate_watched_stocks_cache()
+        # Backfill market column for existing watched stocks
+        self._backfill_watched_stocks_market()
 
         self._initialized = True
         logger.info(f"数据库初始化完成: {db_url}")
@@ -608,6 +690,7 @@ class DatabaseManager:
             "cached_year_high REAL",
             "cached_year_low REAL",
             "indicators_cached_at DATETIME",
+            "market VARCHAR(10)",
         ]
 
         with self._engine.connect() as conn:
@@ -623,6 +706,27 @@ class DatabaseManager:
                     else:
                         logger.warning(f"添加列 {col_name} 时出错: {e}")
             conn.commit()
+
+    def _backfill_watched_stocks_market(self):
+        """Backfill the 'market' column for existing watched stocks that have NULL."""
+        try:
+            from data_provider.base import detect_market
+            with self._engine.connect() as conn:
+                rows = conn.execute(
+                    text("SELECT id, stock_code FROM watched_stocks WHERE market IS NULL")
+                ).fetchall()
+                if not rows:
+                    return
+                for row in rows:
+                    market = detect_market(row[1])
+                    conn.execute(
+                        text("UPDATE watched_stocks SET market = :m WHERE id = :id"),
+                        {"m": market, "id": row[0]}
+                    )
+                conn.commit()
+                logger.info(f"Backfilled market for {len(rows)} watched stocks")
+        except Exception as e:
+            logger.warning(f"Backfill market failed (non-fatal): {e}")
 
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':
@@ -657,31 +761,43 @@ class DatabaseManager:
         except Exception as e:
             logger.warning(f"清理数据库引擎时出错: {e}")
     
-    def get_session(self) -> Session:
+    def get_session(self, auto_commit: bool = True) -> 'SessionContext':
         """
-        获取数据库 Session
-        
+        获取数据库 Session 上下文管理器
+
         使用示例:
             with db.get_session() as session:
                 # 执行查询
-                session.commit()  # 如果需要
+                result = session.query(...).all()
+                # 自动提交（除非发生异常）
+
+        或者使用显式事务控制:
+            with db.get_session(auto_commit=False) as session:
+                # 执行多个操作
+                session.add(obj1)
+                session.add(obj2)
+                session.commit()  # 手动提交
+
+        Args:
+            auto_commit: 是否自动提交事务（默认 True）
+
+        Returns:
+            SessionContext: 会话上下文管理器
+
+        Raises:
+            RuntimeError: 如果数据库未初始化
         """
         if not getattr(self, '_initialized', False) or not hasattr(self, '_SessionLocal'):
             raise RuntimeError(
                 "DatabaseManager 未正确初始化。"
                 "请确保通过 DatabaseManager.get_instance() 获取实例。"
             )
-        session = self._SessionLocal()
-        try:
-            return session
-        except Exception:
-            session.close()
-            raise
+        return SessionContext(self._SessionLocal(), auto_commit=auto_commit)
 
     @contextmanager
     def session_scope(self):
         """Provide a transactional scope around a series of operations."""
-        session = self.get_session()
+        session = self._SessionLocal()
         try:
             yield session
             session.commit()
